@@ -3616,40 +3616,26 @@ speedSettingsItem.detail = trimmedText;
 
         NSMutableArray *newSections = [NSMutableArray arrayWithArray:originalSections];
 
-        // ===== 适配液态玻璃（YTT）分区 =====
+        // ===== 适配液态玻璃（YTT）入口 =====
         AWESettingSectionModel *glassSection = [[%c(AWESettingSectionModel) alloc] init];
         glassSection.type = 0;
         glassSection.sectionHeaderHeight = 40;
         glassSection.sectionHeaderTitle = @"适配液态玻璃";
-        NSMutableArray<AWESettingItemModel *> *glassItems = [NSMutableArray array];
-        NSArray<NSArray<NSString *> *> *yttItems = @[
-            @[@"底栏官方玻璃", @"YTT.glass", @"把底栏模糊层换成官方玻璃"],
-            @[@"清除底栏渐变", @"YTT.clear", @"摘掉压暗玻璃的黑色渐变"],
-            @[@"背景延伸", @"YTT.extend", @"作品背景铺满屏幕底部"],
-            @[@"玻璃胶囊跟随", @"YTT.capsule", @"切换时玻璃胶囊跟随滑动"],
-        ];
-        for (NSArray<NSString *> *yinfo in yttItems) {
-            AWESettingItemModel *gItem = [[%c(AWESettingItemModel) alloc] init];
-            gItem.identifier = yinfo[1];
-            gItem.title = yinfo[0];
-            BOOL on = [[NSUserDefaults standardUserDefaults] boolForKey:yinfo[1]];
-            gItem.detail = on ? @"已开启" : @"已关闭";
-            gItem.type = 0;
-            gItem.iconImageName = @"awe-settings-icon-opensource-notice";
-            gItem.cellType = 26;
-            gItem.colorStyle = 0;
-            gItem.isEnable = YES;
-            AWESettingItemModel *captured = gItem;
-            NSString *key = yinfo[1];
-            gItem.cellTappedBlock = ^{
-                BOOL now = ![[NSUserDefaults standardUserDefaults] boolForKey:key];
-                [[NSUserDefaults standardUserDefaults] setBool:now forKey:key];
-                captured.detail = now ? @"已开启" : @"已关闭";
-                [DYYYUtils showToast:([NSString stringWithFormat:@"%@: %@", captured.title, now ? @"已开启" : @"已关闭"])];
-            };
-            [glassItems addObject:gItem];
-        }
-        glassSection.itemArray = glassItems;
+        AWESettingItemModel *yttItem = [[%c(AWESettingItemModel) alloc] init];
+        yttItem.identifier = @"YTTPage";
+        yttItem.title = @"YTT";
+        yttItem.detail = @"液态玻璃适配 v2.0";
+        yttItem.type = 0;
+        yttItem.iconImageName = @"awe-settings-icon-opensource-notice";
+        yttItem.cellType = 26;
+        yttItem.colorStyle = 0;
+        yttItem.isEnable = YES;
+        yttItem.cellTappedBlock = ^{
+            UIViewController *rootVC = self.controllerDelegate;
+            UIViewController *page = [[NSClassFromString(@"QDYTTPageController") alloc] init];
+            [rootVC.navigationController pushViewController:page animated:YES];
+        };
+        glassSection.itemArray = @[ yttItem ];
         [newSections insertObject:glassSection atIndex:0];
 
         [newSections insertObject:newSection atIndex:0];
