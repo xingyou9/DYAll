@@ -46,12 +46,19 @@ static NSString *const kQDBlockTeen     = @"DYYYBlockTeenModeAlert";
 static NSString *const kQDDisableHaptic = @"DYYYDisableHaptic";
 static NSString *const kQDBlockReview   = @"DYYYBlockReviewPrompt";
 static NSString *const kQDBlockAppStore = @"DYYYBlockAppStoreJump";
+static NSString *const kQDSmoothMode    = @"DYYYSmoothMode";
+static NSString *const kQDSkipSplash    = @"DYYYSkipSplashAd";
 
 // 元抖自己的玻璃视图打这个 tag，避免被「关闭毛玻璃」误伤
 #define QD_KEEP_GLASS_TAG 993344
 
 static BOOL QDBool(NSString *key) {
     return [[NSUserDefaults standardUserDefaults] boolForKey:key];
+}
+
+/// 流畅模式是否开启（供预加载/缓存/动效策略统一读取）。
+static BOOL QDSmoothActive(void) {
+    return QDBool(kQDSmoothMode);
 }
 
 static void QDExtraRegisterDefaults(void) {
@@ -68,6 +75,8 @@ static void QDExtraRegisterDefaults(void) {
             kQDDisableHaptic : @NO,
             kQDBlockReview   : @YES,
             kQDBlockAppStore : @NO,
+            kQDSmoothMode    : @NO,
+            kQDSkipSplash    : @YES,
         }];
     });
 }
@@ -257,6 +266,59 @@ static void QDDisableRemoteCommands(void) {
 
 #pragma mark - 启动
 
+/// 开屏广告的「跳过」按钮每次布局都可能是新对象，所以按标题在窗口里现找。
+static UIControl *QDFindSkipControlInView(UIView *root, int depth) {
+    if (depth > 8 || root == nil) return nil;
+    if ([root isKindOfClass:[UIControl class]]) {
+        UIControl *c = (UIControl *)root;
+        if (c.hidden || c.alpha < 0.05 || !c.userInteractionEnabled) return nil;
+        NSString *t = nil;
+        if ([c isKindOfClass:[UIButton class]]) {
+            t = [(UIButton *)c currentTitle] ?: [(UIButton *)c titleForState:UIControlStateNormal];
+        }
+        if (t.length == 0) {
+            for (UIView *sub in root.subviews) {
+                if ([sub isKindOfClass:[UILabel class]]) { t = [(UILabel *)sub text]; break; }
+            }
+        }
+        if (t.length) {
+            NSString *s = [t stringByReplacingOccurrencesOfString:@" " withString:@""];
+            if ([s containsString:@"跳过"] || [s caseInsensitiveContainsString:@"skip"]) {
+                CGRect r = [c convertRect:c.bounds toView:nil];
+                CGRect sb = [UIScreen mainScreen].bounds;
+                if (CGRectIntersectsRect(r, sb) && c.window) return c;
+            }
+        }
+    }
+    for (UIView *sub in root.subviews) {
+        UIControl *hit = QDFindSkipControlInView(sub, depth + 1);
+        if (hit) return hit;
+    }
+    return nil;
+}
+
+static void QDTrySkipSplashAd(void) {
+    for (UIWindow *w in [UIApplication sharedApplication].windows) {
+        if (w.hidden || w.alpha < 0.05) continue;
+        UIControl *btn = QDFindSkipControlInView(w, 0);
+        if (btn) {
+            [btn sendActionsForControlEvents:UIControlEventTouchUpInside];
+            return;
+        }
+    }
+}
+
+static void QDScheduleSkipSplash(void) {
+    if (!QDBool(kQDSkipSplash)) return;
+    // 开屏是分层出来的，按钮出现在 0.3~2.5s 之间，扫若干次即可，命中一次就停。
+    for (NSInteger i = 1; i <= 12; i++) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * i * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            QDTrySkipSplashAd();
+        });
+    }
+}
+
 %hook UIApplication
 
 - (void)applicationDidFinishLaunching:(UIApplication *)application {
@@ -267,6 +329,7 @@ static void QDDisableRemoteCommands(void) {
         QDDisableRemoteCommands();
         QDApplyPreloadPolicy();
     });
+    QDScheduleSkipSplash();
 }
 
 - (void)applicationDidBecomeActive:(UIApplication *)application {
@@ -275,6 +338,7 @@ static void QDDisableRemoteCommands(void) {
         [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:nil];
         QDDisableRemoteCommands();
     }
+    QDScheduleSkipSplash();
 }
 
 - (void)openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenExternalURLOptionsKey, id> *)options completionHandler:(void (^)(BOOL success))completion {

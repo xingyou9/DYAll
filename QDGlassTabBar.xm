@@ -81,6 +81,15 @@ static BOOL gQDToastShown = NO;
 static NSString *gQDLastFailReason = nil;
 static BOOL gQDFloatActive = NO;      // 当前是否处于悬浮胶囊引擎
 
+// —— 悬浮胶囊引擎的运行时状态 ——
+static UITabBar *gFloatBar = nil;                 // 自建的系统 UITabBar（iOS 26+ 自带液态玻璃胶囊）
+static id gFloatProxy = nil;                      // 它的 delegate
+static NSArray<NSNumber *> *gFloatKinds = nil;    // 与 items 同序；-1 = 拍摄
+static NSArray *gFloatButtons = nil;              // 与 items 同序的抖音原始按钮
+static NSString *gFloatSignature = nil;           // 条目签名，变化才重建
+static UITabBarItem *gFloatLastItem = nil;        // 拍摄点击后选择态弹回这里
+static __weak UIView *gFloatHost = nil;           // 宿主抖音底栏
+
 // 同样不能依赖编译期 SDK 版本，直接问运行时有没有这个类。
 BOOL QDYTTGlassNativeAvailable(void) {
     return NSClassFromString(@"UIGlassEffect") != nil;
