@@ -200,14 +200,10 @@ static UIView *QDBuildHeroHeader(CGFloat width) {
         tv.backgroundColor = [UIColor clearColor];
         tv.backgroundView = nil;
 
-        UIView *hero = QDBuildHeroHeader(tv.bounds.size.width ? tv.bounds.size.width : self.view.bounds.size.width);
-        // 用自动布局算出精确高度再落位，避免固定高度在不同字号下破版
-        [hero setNeedsLayout];
-        [hero layoutIfNeeded];
-        CGFloat h = [hero systemLayoutSizeFittingSize:CGSizeMake(tv.bounds.size.width, UILayoutFittingCompressedSizeHeight)]
-                        .height;
-        if (h < 10) h = hero.frame.size.height;
-        hero.frame = CGRectMake(0, 0, tv.bounds.size.width, h);
+        CGFloat headerWidth = tv.bounds.size.width > 10 ? tv.bounds.size.width : self.view.bounds.size.width;
+        UIView *hero = QDBuildHeroHeader(headerWidth);
+        // Hero 为固定结构（132卡高+16上下边距），内部全部约束定位，无固定坐标破版风险
+        hero.autoresizingMask = UIViewAutoresizingFlexibleWidth;
         tv.tableHeaderView = hero;
     }
 }
