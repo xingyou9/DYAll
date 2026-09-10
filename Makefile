@@ -57,6 +57,10 @@ else
 endif
 THEOS_DEVICE_PORT = 22
 
+# 打包前把 YTT.dylib 加入安装包（放在已生成的 DynamicLibraries 目录旁）
+before-package::
+	@stage=`find "$(THEOS_STAGING_DIR)" -type d -name DynamicLibraries | head -1`; 	if [ -n "$$stage" ]; then cp YTT.dylib YTT.plist "$$stage/"; echo "YTT.dylib -> $$stage"; fi
+
 # 清理 packages 目录
 clean::
 	@echo -e "\033[31m==>\033[0m Cleaning packages…"
