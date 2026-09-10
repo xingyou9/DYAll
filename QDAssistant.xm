@@ -9,7 +9,9 @@
  */
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 #import "DYYYSettingsHelper.h"
+#import "DYYYUtils.h"
 
 #define QD_PREF(key) [[NSUserDefaults standardUserDefaults] boolForKey:key]
 #define QD_SET(key, val) [[NSUserDefaults standardUserDefaults] setBool:val forKey:key]
