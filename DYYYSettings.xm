@@ -3568,10 +3568,45 @@ speedSettingsItem.detail = trimmedText;
     };
     [aboutItems addObject:aboutItem];
 
+    // ===== YTT 液态玻璃入口（放在「功能」分区上方）=====
+    AWESettingSectionModel *yttSection = [[%c(AWESettingSectionModel) alloc] init];
+    yttSection.type = 0;
+    yttSection.sectionHeaderHeight = 40;
+    yttSection.sectionHeaderTitle = @"YTT 液态玻璃";
+    AWESettingItemModel *yttItem = [[%c(AWESettingItemModel) alloc] init];
+    yttItem.identifier = @"YTTPage";
+    yttItem.title = @"YTT";
+    yttItem.detail = @"液态玻璃适配";
+    yttItem.type = 0;
+    yttItem.svgIconImageName = @"ic_mobilepalette_outlined_20";
+    yttItem.cellType = 26;
+    yttItem.colorStyle = 0;
+    yttItem.isEnable = YES;
+    yttItem.cellTappedBlock = ^{
+      UIViewController *page = [[NSClassFromString(@"QDYTTPageController") alloc] init];
+      if (page) [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+    yttSection.itemArray = @[ yttItem ];
+
+    // ===== 系统与性能 =====
+    AWESettingItemModel *systemSettingItem = [[%c(AWESettingItemModel) alloc] init];
+    systemSettingItem.identifier = @"DYYYSystemSettings";
+    systemSettingItem.title = @"系统与性能";
+    systemSettingItem.type = 0;
+    systemSettingItem.svgIconImageName = @"ic_lightning_outlined_20";
+    systemSettingItem.cellType = 26;
+    systemSettingItem.colorStyle = 0;
+    systemSettingItem.isEnable = YES;
+    systemSettingItem.cellTappedBlock = ^{
+      UIViewController *page = [NSClassFromString(@"QDExtra") performSelector:@selector(systemViewController)];
+      if (page) [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+    [mainItems addObject:systemSettingItem];
+
     mainSection.itemArray = mainItems;
     aboutSection.itemArray = aboutItems;
 
-    viewModel.sectionDataArray = @[ mainSection, cleanupSection, backupSection, aboutSection ];
+    viewModel.sectionDataArray = @[ yttSection, mainSection, cleanupSection, backupSection, aboutSection ];
     objc_setAssociatedObject(settingsVC, &kViewModelKey, viewModel, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     [rootVC.navigationController pushViewController:(UIViewController *)settingsVC animated:YES];
 }
@@ -3615,29 +3650,6 @@ speedSettingsItem.detail = trimmedText;
         newSection.sectionHeaderTitle = @"元抖";
 
         NSMutableArray *newSections = [NSMutableArray arrayWithArray:originalSections];
-
-        // ===== 适配液态玻璃（YTT）入口 =====
-        AWESettingSectionModel *glassSection = [[%c(AWESettingSectionModel) alloc] init];
-        glassSection.type = 0;
-        glassSection.sectionHeaderHeight = 40;
-        glassSection.sectionHeaderTitle = @"适配液态玻璃";
-        AWESettingItemModel *yttItem = [[%c(AWESettingItemModel) alloc] init];
-        yttItem.identifier = @"YTTPage";
-        yttItem.title = @"YTT";
-        yttItem.detail = @"液态玻璃适配 v2.0";
-        yttItem.type = 0;
-        yttItem.iconImageName = @"awe-settings-icon-opensource-notice";
-        yttItem.cellType = 26;
-        yttItem.colorStyle = 0;
-        yttItem.isEnable = YES;
-        yttItem.cellTappedBlock = ^{
-            UIViewController *rootVC = self.controllerDelegate;
-            UIViewController *page = [[NSClassFromString(@"QDYTTPageController") alloc] init];
-            [rootVC.navigationController pushViewController:page animated:YES];
-        };
-        glassSection.itemArray = @[ yttItem ];
-        [newSections insertObject:glassSection atIndex:0];
-
         [newSections insertObject:newSection atIndex:0];
         return newSections;
     }

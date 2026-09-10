@@ -690,6 +690,19 @@
         [viewModels addObject:timerCloseViewModel];
     }
 
+    // 关键修复：现代面板按 viewModel.isModern 走不同的渲染分支。
+    // 之前 DYYY 自建的 viewModel 没带这个标志，单元格内部拿不到内容 → 面板呈现出
+    // 一条灰色空白（首页长按看到「什么都没有」）。统一补上即可。
+    for (AWELongPressPanelBaseViewModel *vm in viewModels) {
+        vm.isModern = YES;
+        vm.showIfNeed = YES;
+    }
+
+    // 一个自定义项都没构建出来时不要塞空组，否则面板会多出一条空白行
+    if (viewModels.count == 0) {
+        return originalArray;
+    }
+
     // 创建自定义组
     NSMutableArray *customGroups = [NSMutableArray array];
     NSInteger totalButtons = viewModels.count;

@@ -652,6 +652,10 @@ static void showIconOptionsDialog(NSString *title, UIImage *previewImage, NSStri
 
 + (AWESettingBaseViewController *)createSubSettingsViewController:(NSString *)title sections:(NSArray *)sectionsArray {
     AWESettingBaseViewController *settingsVC = [[NSClassFromString(@"AWESettingBaseViewController") alloc] init];
+    // 打标记：让 QDSettingsTheme 把元抖的视觉主题应用到本页（抖音原生设置页不会被影响）
+    objc_setAssociatedObject(settingsVC, "qd_is_qingdou_page", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(settingsVC, "qd_page_title", title, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    settingsVC.title = title;
     dispatch_async(dispatch_get_main_queue(), ^{
       if ([settingsVC.view isKindOfClass:[UIView class]]) {
           Class navBarClass = NSClassFromString(@"AWENavigationBar");
