@@ -102,7 +102,7 @@ static NSString *DYYYCustomAssetsDirectory(void) {
 
     dispatch_once(&onceToken, ^{
       NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-      customDirectory = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+      customDirectory = [documentsPath stringByAppendingPathComponent:@"轻抖"];
       [[NSFileManager defaultManager] createDirectoryAtPath:customDirectory withIntermediateDirectories:YES attributes:nil error:nil];
     });
 
@@ -8939,6 +8939,9 @@ static void findTargetViewInView(UIView *view) {
 }
 
 %ctor {
+    // 自动完成用户协议（不再弹出确认窗口）
+    [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYUserAgreementAccepted"];
+
     Class interactionBaseLabelClass = objc_getClass("AWECommentSwiftBizUI.CommentInteractionBaseLabel");
     if (interactionBaseLabelClass) {
         %init(DYYYCommentExactTimeGroup, AWECommentSwiftBizUI_CommentInteractionBaseLabel = interactionBaseLabelClass);

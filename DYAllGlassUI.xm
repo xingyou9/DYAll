@@ -1,9 +1,11 @@
 /**
- * DYAll 聚合版 - 液态玻璃统一界面主题
+ * DYAll / 轻抖 — 液态玻璃主题界面
  *
- * 为 DYYYSettingViewController 应用 iOS 26+ 原生液态玻璃(UIGlassEffect)样式；
- * 在 iOS 26 以下系统自动回退为系统材质毛玻璃(UIBlurEffect)。
- * 纯增量修改，不改动 DYYY 原有逻辑。
+ * 对设置界面做整体视觉重构，与原版 DYYY 明显区分：
+ *  - iOS 26+ 使用系统原生液态玻璃 UIGlassEffect 作为全局背景
+ *  - 旧系统回退为系统材质毛玻璃
+ *  - 导航标题改为"轻抖"，配浅青色调强调色
+ *  - 表格透明化以透出玻璃层
  */
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
@@ -14,14 +16,13 @@ static BOOL DYAllGlassPrefEnabled(void) {
     return ![[NSUserDefaults standardUserDefaults] boolForKey:@"DYAllGlassUIDisabled"];
 }
 
-// iOS 26 液态玻璃效果类，运行时探测，避免在旧系统上引用不存在符号
+// iOS 26 液态玻璃效果类，运行时探测，避免旧系统引用不存在的符号
 static UIVisualEffect * _Nullable DYAllGlassEffect(void) {
     Class glassEffectClass = NSClassFromString(@"UIGlassEffect");
     if (glassEffectClass) {
         id effect = [[glassEffectClass alloc] init];
         if (effect) return effect;
     }
-    // 回退：iOS 13+ 系统毛玻璃材质（风格接近液态玻璃）
     return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
 }
 
@@ -30,14 +31,15 @@ static UIVisualEffect * _Nullable DYAllGlassEffect(void) {
 - (void)viewDidLoad {
     %orig;
 
+    self.title = @"轻抖";
+    self.navigationController.navigationBar.tintColor = [UIColor colorWithRed:0.15 green:0.65 blue:0.72 alpha:1.0];
+
     if (!DYAllGlassPrefEnabled()) return;
 
     UIView *glassView = [[UIVisualEffectView alloc] initWithEffect:DYAllGlassEffect()];
     glassView.frame = self.view.bounds;
     glassView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     glassView.userInteractionEnabled = NO;
-
-    // 插到最底层作为玻璃背景，原有 tableView 改为透明以透出玻璃
     [self.view insertSubview:glassView atIndex:0];
 
     for (UIView *sub in self.view.subviews) {
@@ -48,6 +50,12 @@ static UIVisualEffect * _Nullable DYAllGlassEffect(void) {
             tv.backgroundView = nil;
         }
     }
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    self.navigationController.navigationBar.prefersLargeTitles = YES;
+    self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeAlways;
 }
 
 %end

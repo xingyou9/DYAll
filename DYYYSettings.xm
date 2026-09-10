@@ -99,7 +99,7 @@ static void DYYYRemoveRemoteConfigObserver(void) {
         UIButton *dyyyBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         dyyyBtn.tag = 232323;
         dyyyBtn.accessibilityLabel = @"DYYYSettingsButton";
-        [dyyyBtn setTitle:@"DYYY" forState:UIControlStateNormal];
+        [dyyyBtn setTitle:@"轻抖" forState:UIControlStateNormal];
 
         UIColor *titleColor = [DYYYUtils isDarkMode] ? [UIColor whiteColor] : [UIColor blackColor];
         [dyyyBtn setTitleColor:titleColor forState:UIControlStateNormal];
@@ -150,7 +150,7 @@ static void DYYYRemoveRemoteConfigObserver(void) {
         UIButton *dyyyBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         dyyyBtn.tag = 232323;
         dyyyBtn.accessibilityLabel = @"DYYYSettingsButton";
-        [dyyyBtn setTitle:@"DYYY" forState:UIControlStateNormal];
+        [dyyyBtn setTitle:@"轻抖" forState:UIControlStateNormal];
 
         UIColor *titleColor = [DYYYUtils isDarkMode] ? [UIColor whiteColor] : [UIColor blackColor];
         [dyyyBtn setTitleColor:titleColor forState:UIControlStateNormal];
@@ -220,15 +220,6 @@ extern "C"
 #endif
 void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
     AWESettingBaseViewController *settingsVC = [[%c(AWESettingBaseViewController) alloc] init];
-    if (!hasAgreed) {
-        [DYYYSettingsHelper showAboutDialog:@"用户协议"
-                                    message:@"本插件为开源项目\n仅供学习交流用途\n如有侵权请联系, GitHub 仓库：huami1314/DYYY\n请遵守当地法律法规, "
-                                            @"逆向工程仅为学习目的\n盗用源码进行商业用途/发布但未标记开源项目必究\n详情请参阅项目内 MIT 许可证\n\n请输入\"我已阅读并同意继续使用\"以继续"
-                                  onConfirm:^{
-                                    [DYYYSettingsHelper showUserAgreementAlert];
-                                  }];
-    }
-
     // 等待视图加载并使用KVO安全访问属性
     dispatch_async(dispatch_get_main_queue(), ^{
       if ([settingsVC.view isKindOfClass:[UIView class]]) {
@@ -2163,7 +2154,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
           NSFileManager *fileManager = [NSFileManager defaultManager];
           NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
           NSString *documentsDirectory = [paths firstObject];
-          NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"DYYY"];
+          NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"轻抖"];
           NSString *jsonFilePath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
 
           NSString *loadingStatus = [DYYYABTestHook isLocalConfigLoaded] ? @"已加载：" : @"未加载：";
@@ -2468,7 +2459,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
                 NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
                 NSString *documentsDirectory = [paths firstObject];
 
-                NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"DYYY"];
+                NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"轻抖"];
                 NSString *jsonFilePath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
 
                 NSData *jsonData = [NSData dataWithContentsOfFile:jsonFilePath];
@@ -2547,7 +2538,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 
                       NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
                       NSString *documentsDirectory = [paths firstObject];
-                      NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"DYYY"];
+                      NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"轻抖"];
                       NSURL *destinationURL = [NSURL fileURLWithPath:[dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"]];
 
                       NSFileManager *fileManager = [NSFileManager defaultManager];
@@ -2617,7 +2608,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
                     return;
                 NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
                 NSString *documentsDirectory = [paths firstObject];
-                NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"DYYY"];
+                NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"轻抖"];
                 NSString *configPath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
 
                 if ([[NSFileManager defaultManager] fileExistsAtPath:configPath]) {
@@ -3234,7 +3225,7 @@ speedSettingsItem.detail = trimmedText;
 
       // 查找并添加图标文件
       NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-      NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+      NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"轻抖"];
 
       NSArray *iconFileNames = @[ @"like_before.png", @"like_after.png", @"comment.png", @"unfavorite.png", @"favorite.png", @"share.png", @"tab_plus.png", @"qingping.gif" ];
 
@@ -3347,7 +3338,7 @@ speedSettingsItem.detail = trimmedText;
           NSDictionary *iconBase64Dict = dyyySettings[@"DYYYIconsBase64"];
           if (iconBase64Dict && [iconBase64Dict isKindOfClass:[NSDictionary class]]) {
               NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-              NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"DYYY"];
+              NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"轻抖"];
               NSFileManager *fileManager = [NSFileManager defaultManager];
 
               if (![fileManager fileExistsAtPath:dyyyFolderPath]) {
@@ -3570,50 +3561,16 @@ speedSettingsItem.detail = trimmedText;
     aboutItem.colorStyle = 0;
     aboutItem.isEnable = YES;
     aboutItem.cellTappedBlock = ^{
-      [DYYYSettingsHelper showAboutDialog:@"关于DYYY"
-                                  message:@"版本: " DYYY_VERSION @"\n\n"
-                                          @"感谢使用DYYY\n\n"
-                                          @"感谢huami开源\n\n"
-                                          @"@维他入我心 基于DYYY二次开发\n\n"
-                                          @"感谢huami group中群友的支持赞助\n\n"
-                                          @"Telegram @huamidev\n\n"
-                                          @"Telegram @vita_app\n\n"
-                                          @"开源地址 huami1314/DYYY\n\n"
-                                          @"仓库地址 Wtrwx/DYYY\n\n"
+      [DYYYSettingsHelper showAboutDialog:@"关于轻抖"
+                                  message:@"版本: " DYYY_VERSION @"
+
+"
+                                          @"轻抖 · 抖音增强聚合版
+液态玻璃界面"
                                 onConfirm:nil];
     };
     [aboutItems addObject:aboutItem];
 
-    AWESettingItemModel *licenseItem = [[%c(AWESettingItemModel) alloc] init];
-    licenseItem.identifier = @"DYYYLicense";
-    licenseItem.title = @"开源协议";
-    licenseItem.detail = @"MIT License";
-    licenseItem.type = 0;
-    licenseItem.iconImageName = @"awe-settings-icon-opensource-notice";
-    licenseItem.cellType = 26;
-    licenseItem.colorStyle = 0;
-    licenseItem.isEnable = YES;
-    licenseItem.cellTappedBlock = ^{
-      [DYYYSettingsHelper showAboutDialog:@"MIT License"
-                                  message:@"Copyright (c) 2024 huami.\n\n"
-                                          @"Permission is hereby granted, free of charge, to any person obtaining a copy "
-                                          @"of this software and associated documentation files (the \"Software\"), to deal "
-                                          @"in the Software without restriction, including without limitation the rights "
-                                          @"to use, copy, modify, merge, publish, distribute, sublicense, and/or sell "
-                                          @"copies of the Software, and to permit persons to whom the Software is "
-                                          @"furnished to do so, subject to the following conditions:\n\n"
-                                          @"The above copyright notice and this permission notice shall be included in all "
-                                          @"copies or substantial portions of the Software.\n\n"
-                                          @"THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR "
-                                          @"IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, "
-                                          @"FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE "
-                                          @"AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER "
-                                          @"LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, "
-                                          @"OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE "
-                                          @"SOFTWARE."
-                                onConfirm:nil];
-    };
-    [aboutItems addObject:licenseItem];
     mainSection.itemArray = mainItems;
     aboutSection.itemArray = aboutItems;
 
@@ -3658,7 +3615,7 @@ speedSettingsItem.detail = trimmedText;
         newSection.itemArray = @[ dyyyItem ];
         newSection.type = 0;
         newSection.sectionHeaderHeight = 40;
-        newSection.sectionHeaderTitle = @"DYYY";
+        newSection.sectionHeaderTitle = @"轻抖";
 
         NSMutableArray *newSections = [NSMutableArray arrayWithArray:originalSections];
         [newSections insertObject:newSection atIndex:0];
