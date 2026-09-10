@@ -386,6 +386,9 @@ static UIView *QDBuildSubHeader(CGFloat width, NSString *title, NSString *subtit
 
     CGFloat w = tv.bounds.size.width > 10 ? tv.bounds.size.width : self.view.bounds.size.width;
     BOOL isRoot = (self.navigationController.viewControllers.firstObject == self);
+    NSString *pageTitle = objc_getAssociatedObject(self, "qd_page_title");
+    if (pageTitle.length == 0) pageTitle = self.title;
+    if (pageTitle.length == 0) pageTitle = @"";
     if (isRoot) {
         tv.tableHeaderView = QDBuildHero(w, self);
     } else {
