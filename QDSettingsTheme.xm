@@ -11,6 +11,10 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
+// 抖音内部类局部声明（本文件作用域内让编译器识别 UIViewController 属性）
+@interface AWESettingBaseViewController : UIViewController
+@end
+
 static BOOL QDIsQingdouPage(UIViewController *vc) {
     return [objc_getAssociatedObject(vc, "qd_is_qingdou_page") boolValue];
 }
