@@ -27,11 +27,12 @@ static NSArray<NSArray<NSString *> *> *QDYTTItems(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         items = @[
-            @[ @"液态玻璃", @"把抖音底栏的模糊层换成官方玻璃材质", @"YTT.glass" ],
+            @[ @"液态玻璃", @"把抖音底栏换成官方液态玻璃材质（总开关）", @"YTT.glass" ],
+            @[ @"悬浮玻璃底栏", @"iOS 26+ 用系统原生胶囊底栏：选中项放大滑动、加号保持原位", @"YTT.floating" ],
+            @[ @"视频透出底栏", @"作品画面延伸到底栏后面，底栏不再是黑色一块", @"YTT.extend" ],
             @[ @"摘掉压暗渐变", @"移除盖在玻璃上的黑色渐变，通透感更强", @"YTT.gradient" ],
             @[ @"清除底栏着色", @"Clear 档：进一步清掉底栏自身的着色层", @"YTT.clear" ],
-            @[ @"背景延伸", @"让作品背景铺满到屏幕最底部", @"YTT.extend" ],
-            @[ @"玻璃胶囊跟随", @"切换 Tab 时玻璃胶囊跟随滑动", @"YTT.capsule" ],
+            @[ @"玻璃胶囊跟随", @"切换 Tab 时玻璃胶囊跟随滑动（仅旧引擎）", @"YTT.capsule" ],
         ];
     });
     return items;

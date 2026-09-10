@@ -22,6 +22,7 @@
 
 #import "DYYYSettingsHelper.h"
 #import "DYYYUtils.h"
+#import "QDGlassTabBar.h"
 
 #define QD_PREF(key) [[NSUserDefaults standardUserDefaults] boolForKey:key]
 #define QD_SET(key, val) [[NSUserDefaults standardUserDefaults] setBool:val forKey:key]
@@ -162,14 +163,29 @@ static NSArray<NSString *> *QDTransparencyKeys(void) {
     [settingsBtn addTarget:self action:@selector(openAllSettings) forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:settingsBtn];
 
+    // 关闭键：X 图标，悬浮窗右上角
     UIButton *closeBtn = [UIButton buttonWithType:UIButtonTypeSystem];
     closeBtn.translatesAutoresizingMaskIntoConstraints = NO;
-    [closeBtn setTitle:@"关闭" forState:UIControlStateNormal];
-    closeBtn.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightRegular];
+    UIImage *xmark = [UIImage systemImageNamed:@"xmark"];
+    if (xmark) {
+        [closeBtn setImage:xmark forState:UIControlStateNormal];
+        closeBtn.tintColor = UIColor.secondaryLabelColor;
+    } else {
+        [closeBtn setTitle:@"✕" forState:UIControlStateNormal];
+        closeBtn.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+        closeBtn.titleEdgeInsets = UIEdgeInsetsMake(0, 0, 2, 0);
+    }
+    closeBtn.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark
+                   ? [UIColor colorWithWhite:1 alpha:0.10]
+                   : [UIColor colorWithWhite:0 alpha:0.06];
+    }];
+    closeBtn.layer.cornerRadius = 15;
+    closeBtn.layer.masksToBounds = YES;
     [closeBtn addTarget:self action:@selector(dismiss) forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:closeBtn];
 
-    CGFloat cardH = 78 + rows * rowH + 58;
+    CGFloat cardH = 66 + rows * rowH + 52;
 
     [NSLayoutConstraint activateConstraints:@[
         // 关键：给卡片一个明确宽度，否则 UIVisualEffectView 没有固有尺寸会被解成 0
@@ -190,19 +206,21 @@ static NSArray<NSString *> *QDTransparencyKeys(void) {
         [subtitle.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
         [subtitle.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:1],
 
-        [table.topAnchor constraintEqualToAnchor:content.topAnchor constant:70],
+        // X 关闭键钉在卡片右上角
+        [closeBtn.topAnchor constraintEqualToAnchor:content.topAnchor constant:14],
+        [closeBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-14],
+        [closeBtn.widthAnchor constraintEqualToConstant:30],
+        [closeBtn.heightAnchor constraintEqualToConstant:30],
+
+        [table.topAnchor constraintEqualToAnchor:content.topAnchor constant:62],
         [table.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
         [table.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
         [table.heightAnchor constraintEqualToConstant:rows * rowH],
 
         [settingsBtn.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:18],
         [settingsBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-18],
-        [settingsBtn.topAnchor constraintEqualToAnchor:table.bottomAnchor constant:6],
+        [settingsBtn.topAnchor constraintEqualToAnchor:table.bottomAnchor constant:8],
         [settingsBtn.heightAnchor constraintEqualToConstant:38],
-
-        [closeBtn.topAnchor constraintEqualToAnchor:settingsBtn.bottomAnchor constant:2],
-        [closeBtn.centerXAnchor constraintEqualToAnchor:content.centerXAnchor],
-        [closeBtn.heightAnchor constraintEqualToConstant:26],
     ]];
 
     UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(onBackdropTap:)];

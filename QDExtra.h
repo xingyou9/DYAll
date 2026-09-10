@@ -17,6 +17,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// 「系统与性能」子设置页（挂在元抖设置主界面的「功能」分区里）。
 + (AWESettingBaseViewController *)systemViewController;
 
+/// 流畅模式状态（主界面快捷按钮读写用）。键：DYYYSmoothMode。
++ (BOOL)smoothMode;
++ (void)setSmoothMode:(BOOL)on;
+
 @end
 
 NS_ASSUME_NONNULL_END

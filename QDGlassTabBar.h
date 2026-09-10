@@ -13,12 +13,15 @@ NS_ASSUME_NONNULL_BEGIN
 /// 注册默认值（液态玻璃默认开启，其余默认关闭）。
 void QDYTTGlassRegisterDefaults(void);
 
-/// 四档开关。
+/// 五档开关。
 BOOL QDYTTGlassEnabled(void);
 BOOL QDYTTGlassClearEnabled(void);
 BOOL QDYTTGlassGradientEnabled(void);
 BOOL QDYTTGlassCapsuleEnabled(void);
 BOOL QDYTTGlassExtendEnabled(void);
+
+/// 悬浮胶囊引擎（iOS 26+ 系统玻璃底栏，加号内联）是否启用。
+BOOL QDYTTGlassFloatingEnabled(void);
 
 /// 系统是否真的带原生液态玻璃（iOS 26+ 的 UIGlassEffect）。
 BOOL QDYTTGlassNativeAvailable(void);

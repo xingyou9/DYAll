@@ -98,7 +98,7 @@ static NSUInteger QDHookNumericGetters(NSArray<NSString *> *classNames, NSArray<
             QDNumericIMP origTyped = (QDNumericIMP)orig;
             long long forced = value;
             IMP stub = imp_implementationWithBlock(^long long(__unsafe_unretained id selfObj) {
-                if (!QDBool(kQDReducePreload)) {
+                if (!QDBool(kQDReducePreload) && !QDSmoothActive()) {
                     return origTyped(selfObj, sel);
                 }
                 return forced;
@@ -175,13 +175,23 @@ static void QDDisableRemoteCommands(void) {
 
 - (void)didMoveToWindow {
     %orig;
-    if (!QDBool(kQDDisableBlur)) return;
+    if (!QDBool(kQDDisableBlur) && !QDSmoothActive()) return;
     if (self.tag == QD_KEEP_GLASS_TAG) return;          // 元抖自己的玻璃不关
     if (self.window == nil) return;
     if (self.bounds.size.height <= 140) return;          // 只关大屏整块的
     NSString *cn = NSStringFromClass([self class]);
     if (![cn hasPrefix:@"AWE"] && ![cn hasPrefix:@"IES"] && ![cn hasPrefix:@"HTS"]) return;
     self.hidden = YES;
+}
+
+%end
+
+// 流畅模式：去掉视差 / 缩放类动效（离屏渲染大户），UI 跟手但不晃
+%hook UIView
+
+- (void)addMotionEffect:(UIMotionEffect *)effect {
+    if (QDSmoothActive()) return;
+    %orig;
 }
 
 %end
@@ -298,6 +308,8 @@ static NSArray<NSArray<NSString *> *> *QDSystemSpecs(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         specs = @[
+            @[ @"流畅模式", kQDSmoothMode, @"一键高性能：收紧预加载与缓存、去视差动效，刷抖音更快更省电不发热" ],
+            @[ @"自动跳过开屏广告", kQDSkipSplash, @"启动时自动点掉「跳过」按钮，直接进首页" ],
             @[ @"灵动岛屏蔽", kQDBlockIsland, @"禁止抖音在灵动岛 / 锁屏弹出「正在播放」" ],
             @[ @"减少预加载", kQDReducePreload, @"压低视频预加载数量，滑动更稳、更省内存" ],
             @[ @"低内存模式", kQDTurboCache, @"收紧网络缓存上限，长时间刷视频不易掉帧" ],
@@ -319,6 +331,15 @@ static NSArray<NSArray<NSString *> *> *QDSystemSpecs(void) {
     QDExtraRegisterDefaults();
 }
 
++ (BOOL)smoothMode {
+    return QDBool(kQDSmoothMode);
+}
+
++ (void)setSmoothMode:(BOOL)on {
+    [[NSUserDefaults standardUserDefaults] setBool:on forKey:kQDSmoothMode];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
 + (AWESettingBaseViewController *)systemViewController {
     NSMutableDictionary *handlers = [NSMutableDictionary dictionary];
 
@@ -330,7 +351,7 @@ static NSArray<NSArray<NSString *> *> *QDSystemSpecs(void) {
             @"subTitle" : spec[2],
             @"detail" : @"",
             @"cellType" : @37,
-            @"imageName" : @"ic_lightning_outlined_20"
+            @"imageName" : @"ic_flash_outlined_20"
         }
                                                           cellTapHandlers:handlers];
         [sysItems addObject:item];

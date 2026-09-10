@@ -1,23 +1,29 @@
 //
 //  QDGlassTabBar.xm
-//  YTT 液态玻璃 — 抖音底栏「原地换皮」
+//  YTT 液态玻璃 — 双引擎
 //
-//  设计铁律（血泪换来的，改动前请先读）
+//  引擎 A · 悬浮胶囊（iOS 26+ 默认）
 //  ---------------------------------------------------------------------------
-//  1. 只换材质，绝不动布局。
-//     找不到现成的毛玻璃层时，才在底栏最底层「补」一块玻璃；frame / 约束 / 层级顺序
-//     一律保持抖音原样。所以中间那颗「+」永远在它原来的位置，不会像自建 UITabBar 那样
-//     被挤到右边单独成圆。
+//  iOS 26 的系统 UITabBar 原生就是「悬浮液态玻璃胶囊」：圆角、留边、选中项放大成
+//  带文字的胶囊并带滑动动画，全是 UIKit 自己画的。所以做法是：
+//    · 自建 UITabBar 挂进抖音底栏（随父视图显隐/位移，不碰抖音布局）；
+//    · 镜像抖音的 4 个 tab + 拍摄入口（加号内联在中间，与原版一致，绝不单独成圆）；
+//    · 点击原样转发给抖音按钮自己的回调（tabBarButtonDidTouchUpInside: /
+//      plusTabBarButtonDidClick:），抖音只认它自己的回调，直接写 selectedIndex 会被吞；
+//    · 抖音底栏内容（背景层 + 按钮）layer.opacity 置 0，但不动 hidden/alpha/frame，
+//      位置、安全区、显隐状态全部保持抖音原样 —— 因此不会再出现按钮跑偏。
 //
-//  2. 材质只用官方 API：[UIGlassEffect effectWithStyle:...]。
-//     `[[UIGlassEffect alloc] init]` 不是指定初始化器，可能拿到不可用对象 —— 全程不用它。
-//     取不到原生玻璃时退回 UIBlurEffect(systemChromeMaterial)，不会出现「什么都没有」。
+//  引擎 B · 原地换皮（旧系统回退）
+//  ---------------------------------------------------------------------------
+//  只换材质不动布局：把底栏现成的毛玻璃层换成 UIGlassEffect / 系统材质。
 //
-//  3. 所有写入都必须先比较再写。
-//     驱动点是抖音底栏自己的 layoutSubviews，逐帧路径上无脑重写会把抖音的布局环踢起来。
-//
-//  4. 任何「没做成」都要能看见。
-//     首次接管成功弹一次 toast；设置页的状态区直接读 QDYTTGlassBarStatus()。
+//  铁律（改动前先读）
+//  ---------------------------------------------------------------------------
+//  1. 绝不用 __IPHONE_OS_VERSION_MAX_ALLOWED 门控 —— 打包 SDK 低于 26 时整段会被剔除，
+//     表现为「液态玻璃一点效果都没有」。全部运行时探测。
+//  2. 所有写入先比较再写；驱动点 layoutSubviews 是逐帧路径。
+//  3. 切页必须转发抖音按钮回调，直接写 selectedIndex 无效。
+//  4. 拍摄按钮 type == 2，不参与 selectedIndex，validIndex 恒为 0。
 //
 
 #import "QDGlassTabBar.h"
@@ -34,11 +40,12 @@
 #pragma mark - 偏好键
 
 // 与 YTT 旧的独立插件共用同一批键名，老用户升级后开关状态不丢。
-static NSString *const kQDYTTKeyGlass    = @"YTT.glass";
-static NSString *const kQDYTTKeyClear    = @"YTT.clear";
-static NSString *const kQDYTTKeyGradient = @"YTT.gradient";
-static NSString *const kQDYTTKeyCapsule  = @"YTT.capsule";
-static NSString *const kQDYTTKeyExtend   = @"YTT.extend";
+static NSString *const kQDYTTKeyGlass     = @"YTT.glass";
+static NSString *const kQDYTTKeyClear     = @"YTT.clear";
+static NSString *const kQDYTTKeyGradient  = @"YTT.gradient";
+static NSString *const kQDYTTKeyCapsule   = @"YTT.capsule";
+static NSString *const kQDYTTKeyExtend    = @"YTT.extend";
+static NSString *const kQDYTTKeyFloating  = @"YTT.floating";
 
 void QDYTTGlassRegisterDefaults(void) {
     static dispatch_once_t once;
@@ -47,8 +54,9 @@ void QDYTTGlassRegisterDefaults(void) {
             kQDYTTKeyGlass    : @YES,   // 主开关默认开：装上就该看得见
             kQDYTTKeyClear    : @NO,    // Clear 档更通透，但浅色页面对比度会掉，默认关
             kQDYTTKeyGradient : @YES,   // 摘掉压暗玻璃的渐变，是玻璃观感的一部分
-            kQDYTTKeyCapsule  : @NO,    // 选中胶囊属于装饰，默认关，避免和抖音自带选中态打架
-            kQDYTTKeyExtend   : @NO,    // 背景延伸会改作品图层 frame，默认关
+            kQDYTTKeyCapsule  : @NO,    // 仅引擎 B 的装饰胶囊，默认关
+            kQDYTTKeyExtend   : @YES,   // 视频透出底栏：底栏后面是画面而不是黑块（用户明确要的）
+            kQDYTTKeyFloating : @YES,   // iOS 26+ 默认走悬浮胶囊引擎
         }];
     });
 }
@@ -62,6 +70,7 @@ BOOL QDYTTGlassClearEnabled(void)    { return QDYTTBool(kQDYTTKeyClear); }
 BOOL QDYTTGlassGradientEnabled(void) { return QDYTTBool(kQDYTTKeyGradient); }
 BOOL QDYTTGlassCapsuleEnabled(void)  { return QDYTTBool(kQDYTTKeyCapsule); }
 BOOL QDYTTGlassExtendEnabled(void)   { return QDYTTBool(kQDYTTKeyExtend); }
+BOOL QDYTTGlassFloatingEnabled(void) { return QDYTTBool(kQDYTTKeyFloating); }
 
 #pragma mark - 状态（给设置页读）
 
@@ -70,6 +79,7 @@ static NSString *gQDBarClassName = nil;
 static BOOL gQDBarGlassApplied = NO;
 static BOOL gQDToastShown = NO;
 static NSString *gQDLastFailReason = nil;
+static BOOL gQDFloatActive = NO;      // 当前是否处于悬浮胶囊引擎
 
 // 同样不能依赖编译期 SDK 版本，直接问运行时有没有这个类。
 BOOL QDYTTGlassNativeAvailable(void) {
@@ -77,7 +87,8 @@ BOOL QDYTTGlassNativeAvailable(void) {
 }
 
 NSString *QDYTTGlassEngineName(void) {
-    return QDYTTGlassNativeAvailable() ? @"原生 UIGlassEffect" : @"降级毛玻璃";
+    if (!QDYTTGlassNativeAvailable()) return @"降级毛玻璃（旧系统）";
+    return gQDFloatActive ? @"原生液态玻璃 · 悬浮胶囊" : @"原生 UIGlassEffect";
 }
 
 NSString *QDYTTGlassBarStatus(void) {
@@ -100,54 +111,6 @@ static char kQDGlassMarkKey;
 static char kQDAddedGlassKey;
 static char kQDCapsuleKey;
 static char kQDOrigFrameKey;
-
-#pragma mark - 材质
-
-static UIColor *QDYTTAccentColor(void) {
-    return [UIColor colorWithRed:0.15 green:0.65 blue:0.72 alpha:1.0];
-}
-
-// 重要：绝不要用 __IPHONE_OS_VERSION_MAX_ALLOWED 包这段逻辑。
-// 打包用的 SDK 通常还不到 iOS 26，一旦被编译期开关挡掉，这里就永远只会走降级毛玻璃，
-// 用户看到的就是「液态玻璃一点效果都没有」。全部改成运行时探测，SDK 版本无关。
-static UIVisualEffect *QDYTTMakeEffect(void) {
-    Class glassClass = NSClassFromString(@"UIGlassEffect");
-    if (glassClass) {
-        id effect = nil;
-        @try {
-            SEL styleSel = NSSelectorFromString(@"effectWithStyle:");
-            if ([glassClass respondsToSelector:styleSel]) {
-                // UIGlassEffectStyle: Regular = 0, Clear = 1
-                NSInteger style = QDYTTGlassClearEnabled() ? 1 : 0;
-                effect = ((id (*)(id, SEL, NSInteger))objc_msgSend)((id)glassClass, styleSel, style);
-            }
-            if (!effect) effect = [[glassClass alloc] init];
-        } @catch (__unused NSException *e) {
-            effect = nil;
-        }
-
-        if (effect) {
-            @try {
-                if (QDYTTGlassClearEnabled() && [effect respondsToSelector:@selector(setTintColor:)]) {
-                    [effect setValue:[UIColor colorWithWhite:0 alpha:0.06] forKey:@"tintColor"];
-                }
-                if ([effect respondsToSelector:@selector(setInteractive:)]) {
-                    [effect setValue:@YES forKey:@"interactive"]; // 按压形变，液态玻璃的「活」感来源
-                }
-            } @catch (__unused NSException *e) {
-            }
-            return effect;
-        }
-    }
-    // 旧系统 / 取不到原生玻璃：系统级材质毛玻璃，观感最接近，且永远不会是「什么都没有」。
-    return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
-}
-
-static BOOL QDYTTIsGlassEffect(UIVisualEffect *effect) {
-    if (!effect) return NO;
-    Class glassClass = NSClassFromString(@"UIGlassEffect");
-    return glassClass && [effect isKindOfClass:glassClass];
-}
 
 #pragma mark - 小工具
 
@@ -296,7 +259,55 @@ static UIView *QDYTTFindBar(void) {
     return QDYTTFindBarInView(target, windowBounds, &bestScore);
 }
 
-#pragma mark - 面纱（压暗玻璃的渐变 / 实色底）处理
+#pragma mark - 引擎 B：材质
+
+static UIColor *QDYTTAccentColor(void) {
+    return [UIColor colorWithRed:0.15 green:0.65 blue:0.72 alpha:1.0];
+}
+
+// 重要：绝不要用 __IPHONE_OS_VERSION_MAX_ALLOWED 包这段逻辑。
+// 打包用的 SDK 通常还不到 iOS 26，一旦被编译期开关挡掉，这里就永远只会走降级毛玻璃，
+// 用户看到的就是「液态玻璃一点效果都没有」。全部改成运行时探测，SDK 版本无关。
+static UIVisualEffect *QDYTTMakeEffect(void) {
+    Class glassClass = NSClassFromString(@"UIGlassEffect");
+    if (glassClass) {
+        id effect = nil;
+        @try {
+            SEL styleSel = NSSelectorFromString(@"effectWithStyle:");
+            if ([glassClass respondsToSelector:styleSel]) {
+                // UIGlassEffectStyle: Regular = 0, Clear = 1
+                NSInteger style = QDYTTGlassClearEnabled() ? 1 : 0;
+                effect = ((id (*)(id, SEL, NSInteger))objc_msgSend)((id)glassClass, styleSel, style);
+            }
+            if (!effect) effect = [[glassClass alloc] init];
+        } @catch (__unused NSException *e) {
+            effect = nil;
+        }
+
+        if (effect) {
+            @try {
+                if (QDYTTGlassClearEnabled() && [effect respondsToSelector:@selector(setTintColor:)]) {
+                    [effect setValue:[UIColor colorWithWhite:0 alpha:0.06] forKey:@"tintColor"];
+                }
+                if ([effect respondsToSelector:@selector(setInteractive:)]) {
+                    [effect setValue:@YES forKey:@"interactive"]; // 按压形变，液态玻璃的「活」感来源
+                }
+            } @catch (__unused NSException *e) {
+            }
+            return effect;
+        }
+    }
+    // 旧系统 / 取不到原生玻璃：系统级材质毛玻璃，观感最接近，且永远不会是「什么都没有」。
+    return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
+}
+
+static BOOL QDYTTIsGlassEffect(UIVisualEffect *effect) {
+    if (!effect) return NO;
+    Class glassClass = NSClassFromString(@"UIGlassEffect");
+    return glassClass && [effect isKindOfClass:glassClass];
+}
+
+#pragma mark - 引擎 B：面纱（压暗玻璃的渐变 / 实色底）处理
 
 /// 把铺满底栏、不透明的「面纱」压掉。只动视觉，不动布局，也绝不碰含控件的层。
 static void QDYTTNeutralizeVeils(UIView *bar) {
@@ -316,6 +327,7 @@ static void QDYTTNeutralizeVeils(UIView *bar) {
     for (UIView *sub in bar.subviews) {
         if ([sub isKindOfClass:[UIVisualEffectView class]]) continue;
         if (objc_getAssociatedObject(sub, &kQDAddedGlassKey)) continue;
+        if (sub == (UIView *)gFloatBar) continue;
         CGRect f = sub.frame;
         if (f.size.width < barW * 0.9 || f.size.height < barH * 0.45) continue;
         // 按钮所在的内容容器必须留着——藏了它整条底栏就空了。
@@ -367,7 +379,7 @@ static void QDYTTRestoreVeils(UIView *bar) {
     }
 }
 
-#pragma mark - 玻璃接管
+#pragma mark - 引擎 B：玻璃接管
 
 /// 收集底栏里「可能承载背景材质」的视图：KVC 命名槽位 + 子树扫描。
 static void QDYTTCollectBackdrops(UIView *bar,
@@ -475,7 +487,7 @@ static void QDYTTRemoveOwnGlass(UIView *bar) {
     objc_setAssociatedObject(bar, &kQDAddedGlassKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-#pragma mark - 选中玻璃胶囊（装饰，默认关闭）
+#pragma mark - 引擎 B：选中玻璃胶囊（装饰，默认关闭）
 
 static void QDYTTUpdateCapsule(UIView *bar, NSArray *buttons) {
     UIVisualEffectView *capsule = objc_getAssociatedObject(bar, &kQDCapsuleKey);
@@ -540,12 +552,10 @@ static void QDYTTUpdateCapsule(UIView *bar, NSArray *buttons) {
 
     if (!CGRectEqualToRect(capsule.frame, rect)) {
         capsule.frame = rect;
-        if (@available(iOS 26.0, *)) {
-            if ([capsule respondsToSelector:@selector(setCornerConfiguration:)]) {
-                Class configClass = NSClassFromString(@"UICornerConfiguration");
-                if (configClass && [configClass respondsToSelector:@selector(capsuleConfiguration)]) {
-                    capsule.cornerConfiguration = [configClass performSelector:@selector(capsuleConfiguration)];
-                }
+        if ([capsule respondsToSelector:@selector(setCornerConfiguration:)]) {
+            Class configClass = NSClassFromString(@"UICornerConfiguration");
+            if (configClass && [configClass respondsToSelector:@selector(capsuleConfiguration)]) {
+                capsule.cornerConfiguration = [configClass performSelector:@selector(capsuleConfiguration)];
             }
         }
     }
@@ -555,7 +565,7 @@ static void QDYTTUpdateCapsule(UIView *bar, NSArray *buttons) {
     }
 }
 
-#pragma mark - 背景延伸（作品图层铺到屏幕底部，消除灰底 / 色差）
+#pragma mark - 引擎 B：背景延伸（视频透出底栏）
 
 static __weak UIView *gQDExtendTarget = nil;
 
@@ -608,7 +618,7 @@ static void QDYTTExtendApply(void) {
     UIWindow *window = [DYYYUtils getActiveWindow];
     if (!window) return;
     CGRect windowBounds = window.bounds;
-    if (windowBounds.size.width < windowBounds.size.height) return;   // 只处理竖屏
+    if (windowBounds.size.width > windowBounds.size.height) return;   // 只处理竖屏
 
     UIView *best = nil;
     NSInteger bestScore = 80;
@@ -646,50 +656,397 @@ static void QDYTTExtendApply(void) {
     best.frame = frame;
 }
 
+#pragma mark - 引擎 A：悬浮胶囊（iOS 26+）
+
+// 抖音私有符号集中在此，改名时只改这里。
+static NSString * const kQDTabClickSelector  = @"tabBarButtonDidTouchUpInside:gestureRecognizer:";
+static NSString * const kQDPlusClickSelector = @"plusTabBarButtonDidClick:";
+static NSString * const kQDBadgeContainerClass = @"AWENormalModeTabBarBadgeContainerView";
+static NSString * const kQDBadgeClass = @"DUXBadge";
+// 抖音按钮 type：2 = 拍摄入口（不参与 selectedIndex）。
+static const long long kQDPlusButtonType = 2;
+
+static UITabBarController *QDFloatControllerForView(UIView *view) {
+    for (UIResponder *r = view.nextResponder; r; r = r.nextResponder) {
+        if ([r isKindOfClass:[UITabBarController class]]) return (UITabBarController *)r;
+    }
+    return nil;
+}
+
+static NSString *QDFloatButtonTitle(id button) {
+    id inner = QDYTTKVC(button, @"innerView");
+    NSString *text = QDYTTKVC(QDYTTKVC(inner, @"label"), @"text");
+    if (text.length > 0) return text;
+    text = QDYTTKVC(inner, @"currentTitleText");
+    if (text.length > 0) return text;
+    text = QDYTTKVC(button, @"currentTitleText");
+    if (text.length > 0) return text;
+    if ([button isKindOfClass:[UIView class]]) {
+        NSString *a11y = [(UIView *)button accessibilityLabel];
+        if (a11y.length > 0 && a11y.length < 8) return a11y;
+    }
+    return nil;
+}
+
+static NSString *QDFloatFallbackTitle(NSInteger kind) {
+    switch (kind) {
+        case 0:  return @"首页";
+        case 1:  return @"朋友";
+        case 2:  return @"消息";
+        case 3:  return @"我";
+        default: return nil;
+    }
+}
+
+// SF Symbols 跟系统玻璃胶囊是一个设计语言：选中 filled，未选中 outlined，
+// 颜色交给 UITabBar 的 tintColor 体系自动适配深浅色。
+static UIImage *QDFloatIcon(NSInteger kind, BOOL selected) {
+    NSString *name = nil;
+    switch (kind) {
+        case 0: name = selected ? @"house.fill" : @"house"; break;
+        case 1: name = selected ? @"person.2.fill" : @"person.2"; break;
+        case 2: name = selected ? @"message.fill" : @"message"; break;
+        case 3: name = selected ? @"person.fill" : @"person"; break;
+    }
+    if (!name) return nil;
+    return [UIImage systemImageNamed:name];
+}
+
+// 读抖音按钮当前的角标（只读不建：getter 可能懒建对象，逐帧路径不安全）。
+static NSString *QDFloatBadgeValue(id button) {
+    if (![button isKindOfClass:[UIView class]]) return nil;
+    UIView *badge = nil;
+    for (UIView *container in ((UIView *)button).subviews) {
+        if (![NSStringFromClass(container.class) isEqualToString:kQDBadgeContainerClass]
+            || container.isHidden || container.alpha < 0.01) {
+            continue;
+        }
+        for (UIView *candidate in container.subviews) {
+            if ([NSStringFromClass(candidate.class) isEqualToString:kQDBadgeClass]
+                && !candidate.isHidden && candidate.alpha >= 0.01
+                && !CGRectIsEmpty(candidate.bounds)) {
+                badge = candidate;
+                break;
+            }
+        }
+        if (badge) break;
+    }
+    if (!badge) return nil;
+
+    NSString *text = QDYTTKVC(badge, @"badgeText");
+    if (text.length > 0) return text;
+    unsigned long long count = [QDYTTKVC(badge, @"badgeNumber") unsignedLongLongValue];
+    if (count > 0) return @(count).stringValue;
+    return @"";   // 有角标但无数字 → 纯红点
+}
+
+static void QDFloatSyncBadges(void) {
+    if (!gFloatBar || gFloatButtons.count == 0) return;
+    NSUInteger count = MIN((NSUInteger)gFloatBar.items.count, gFloatButtons.count);
+    for (NSUInteger i = 0; i < count; i++) {
+        UITabBarItem *item = gFloatBar.items[i];
+        NSString *value = QDFloatBadgeValue(gFloatButtons[i]);
+        NSString *current = item.badgeValue;
+        if (current != value && ![current isEqualToString:value]) item.badgeValue = value;
+    }
+}
+
+#pragma mark 悬浮条代理
+
+@interface QDFloatBarProxy : NSObject <UITabBarDelegate>
+- (void)plusKeyDidTap;
+@end
+
+@implementation QDFloatBarProxy
+
+- (void)plusKeyDidTap {
+    // 拍摄不是页面，走抖音自己的拍摄回调，传它自己的按钮。
+    UITabBarController *controller = gFloatHost ? QDFloatControllerForView(gFloatHost) : nil;
+    if (!controller && gFloatBar) controller = QDFloatControllerForView(gFloatBar);
+    SEL selector = NSSelectorFromString(kQDPlusClickSelector);
+    id plus = nil;
+    for (NSUInteger i = 0; i < gFloatKinds.count; i++) {
+        if (gFloatKinds[i].integerValue == -1) { plus = gFloatButtons[i]; break; }
+    }
+    if (controller && plus && [controller respondsToSelector:selector]) {
+        ((void (*)(id, SEL, id))objc_msgSend)(controller, selector, plus);
+    }
+}
+
+- (void)tabBar:(UITabBar *)tabBar didSelectItem:(UITabBarItem *)item {
+    UITabBarController *controller = QDFloatControllerForView(tabBar);
+    if (!controller && gFloatHost) controller = QDFloatControllerForView(gFloatHost);
+    NSInteger index = (NSInteger)[tabBar.items indexOfObject:item];
+    if (!controller || index < 0 || index >= (NSInteger)gFloatButtons.count) return;
+
+    id button = gFloatButtons[(NSUInteger)index];
+    if (gFloatKinds[(NSUInteger)index].integerValue == -1) {
+        [self plusKeyDidTap];
+        // 拍摄不改变选中态，立刻弹回上一个 item。
+        UITabBarItem *last = gFloatLastItem;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (last && gFloatBar.selectedItem != last) gFloatBar.selectedItem = last;
+        });
+        return;
+    }
+
+    // 切页必须走抖音自己的按钮点击回调。直接写 selectedIndex 会被它的 override 吞掉。
+    // 连手势一并原样回传，抖音据此构造点击上下文，与真实点按走完全相同的路径。
+    SEL selector = NSSelectorFromString(kQDTabClickSelector);
+    if ([controller respondsToSelector:selector]) {
+        id ges = QDYTTKVC(button, @"singleTapGes");
+        ((void (*)(id, SEL, id, id))objc_msgSend)(controller, selector, button, ges);
+    }
+    gFloatLastItem = item;
+}
+
+@end
+
+#pragma mark 悬浮条同步
+
+/// 抖音自绘底栏的内容隐去：背景层与按钮 layer.opacity=0、按钮不吃触摸，
+/// 交互交给悬浮胶囊。只动 opacity，不动 hidden/alpha——那是抖音的显隐状态，
+/// 悬浮条靠继承跟随它（评论区打开时抖音会自己收起底栏，胶囊跟着一起消失）。
+static void QDFloatSetContentVisible(AWENormalModeTabBar *bar, NSArray *buttons, BOOL visible) {
+    if (!bar) return;
+    float opacity = visible ? 1.0f : 0.0f;
+    NSArray *backdrops = @[ QDYTTKVC(bar, @"backgroundView") ?: [NSNull null],
+                            QDYTTKVC(bar, @"awe_blurView") ?: [NSNull null],
+                            QDYTTKVC(bar, @"separatorLine") ?: [NSNull null],
+                            QDYTTKVC(bar, @"skinContainerView") ?: [NSNull null] ];
+    for (id backdrop in backdrops) {
+        if (![backdrop isKindOfClass:[UIView class]]) continue;
+        CALayer *layer = ((UIView *)backdrop).layer;
+        if (layer.opacity != opacity) layer.opacity = opacity;
+    }
+    for (id button in buttons) {
+        if (![button isKindOfClass:[UIView class]]) continue;
+        UIView *view = (UIView *)button;
+        if (view.layer.opacity != opacity) view.layer.opacity = opacity;
+        if (view.userInteractionEnabled != visible) view.userInteractionEnabled = visible;
+    }
+}
+
+static BOOL QDFloatSyncItems(UITabBarController *controller, NSArray *buttons) {
+    NSMutableArray<NSString *> *titles = [NSMutableArray array];
+    NSMutableArray<NSNumber *> *kinds = [NSMutableArray array];
+    NSMutableArray *mirrored = [NSMutableArray array];
+    NSMutableString *signature = [NSMutableString string];
+
+    for (id button in buttons) {
+        UIView *view = [button isKindOfClass:[UIView class]] ? (UIView *)button : nil;
+        // 源按钮的 opacity 被本功能置零，不能作为存在性信号；显隐与父视图保留原始语义。
+        if (!view || view.isHidden || !view.superview) continue;
+
+        BOOL isPlus = ([QDYTTKVC(button, @"type") longLongValue] == kQDPlusButtonType);
+
+        NSString *title = isPlus ? @"拍摄" : QDFloatButtonTitle(button);
+        NSInteger kind = isPlus ? -1 : (NSInteger)[QDYTTKVC(button, @"validIndex") integerValue];
+        if (!isPlus && title.length == 0) title = QDFloatFallbackTitle(kind);
+        if (title.length == 0) continue;
+
+        [titles addObject:title];
+        [kinds addObject:@(kind)];
+        [mirrored addObject:button];
+        [signature appendFormat:@"%@:%ld|", title, (long)kind];
+    }
+
+    if (mirrored.count < 2) return NO;
+    // 按钮引用每次都刷新：抖音可能重建出标题相同的新按钮，签名察觉不到，
+    // 拿着旧对象转发点击就会落空。
+    gFloatButtons = mirrored;
+
+    BOOL rebuilt = ![signature isEqualToString:gFloatSignature];
+    if (rebuilt) {
+        NSMutableArray<UITabBarItem *> *items = [NSMutableArray arrayWithCapacity:titles.count];
+        [titles enumerateObjectsUsingBlock:^(NSString *title, NSUInteger index, __unused BOOL *stop) {
+            NSInteger kind = kinds[index].integerValue;
+            UIImage *icon = (kind >= 0) ? QDFloatIcon(kind, NO)
+                                        : [UIImage systemImageNamed:@"plus"];
+            UITabBarItem *item = [[UITabBarItem alloc] initWithTitle:title image:icon tag:(NSInteger)index];
+            [items addObject:item];
+        }];
+        gFloatBar.items = items;
+        gFloatKinds = kinds;
+        gFloatSignature = [signature copy];
+    }
+
+    // 选中/未选中两套图标（filled / outlined）
+    NSInteger selectedKind = (NSInteger)controller.selectedIndex;
+    NSUInteger count = MIN((NSUInteger)gFloatBar.items.count, gFloatKinds.count);
+    for (NSUInteger i = 0; i < count; i++) {
+        UITabBarItem *item = gFloatBar.items[i];
+        NSInteger kind = gFloatKinds[i].integerValue;
+        if (kind < 0) continue;
+        UIImage *sel = QDFloatIcon(kind, YES);
+        if (![item.selectedImage isEqual:sel]) item.selectedImage = sel;
+    }
+
+    // 选中态跟随抖音（抖音切页可能由别的入口触发，比如推送跳转）
+    NSInteger current = -1;
+    for (NSUInteger i = 0; i < gFloatKinds.count; i++) {
+        if (gFloatKinds[i].integerValue == selectedKind) { current = (NSInteger)i; break; }
+    }
+    if (current >= 0 && current < (NSInteger)gFloatBar.items.count) {
+        UITabBarItem *item = gFloatBar.items[(NSUInteger)current];
+        if (gFloatBar.selectedItem != item) {
+            gFloatBar.selectedItem = item;
+            gFloatLastItem = item;
+        }
+    }
+
+    QDFloatSyncBadges();
+    return rebuilt;
+}
+
+/// 读取抖音按钮当前的实色，用于判断宿主明暗。抖音自己换肤，window 的 trait 不一定准，
+/// 这里取底栏文字色做锚：白 → 宿主是亮的。
+static UIUserInterfaceStyle QDFloatHostStyle(AWENormalModeTabBar *bar, NSArray *buttons) {
+    UIWindow *window = bar.window;
+    if (window) {
+        UIUserInterfaceStyle style = window.windowScene.traitCollection.userInterfaceStyle;
+        if (style != UIUserInterfaceStyleUnspecified) return style;
+    }
+    return UIUserInterfaceStyleDark;   // 抖音默认深色底
+}
+
+static void QDFloatTearDown(AWENormalModeTabBar *bar) {
+    if (gFloatBar) {
+        [gFloatBar removeFromSuperview];
+        gFloatBar = nil;
+        gFloatProxy = nil;
+        gFloatButtons = nil;
+        gFloatKinds = nil;
+        gFloatSignature = nil;
+        gFloatLastItem = nil;
+    }
+    if (bar) QDFloatSetContentVisible(bar, QDYTTBarButtons(bar), YES);
+    gQDFloatActive = NO;
+}
+
+static void QDFloatUpdate(AWENormalModeTabBar *bar) {
+    // 抖音换过底栏实例时，先把旧实例的内容还原。
+    AWENormalModeTabBar *previous = gFloatHost;
+    if (previous && previous != bar) {
+        QDFloatSetContentVisible(previous, QDYTTBarButtons(previous), YES);
+        gFloatSignature = nil;   // 新实例要重建 items
+    }
+    gFloatHost = bar;
+
+    UITabBarController *controller = QDFloatControllerForView(bar);
+    if (!controller) {
+        gQDLastFailReason = @"未找到 TabBarController";
+        return;
+    }
+
+    NSArray *buttons = QDYTTBarButtons(bar);
+    if (buttons.count < 2) {
+        gQDLastFailReason = @"未找到底栏按钮";
+        return;
+    }
+
+    if (!gFloatBar) {
+        gFloatProxy = [[QDFloatBarProxy alloc] init];
+        gFloatBar = [[UITabBar alloc] initWithFrame:bar.bounds];
+        gFloatBar.delegate = gFloatProxy;
+        gFloatBar.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        // iOS 26 的 UITabBar 出厂态就是悬浮液态玻璃胶囊，不碰 appearance，
+        // 碰了反而会从「系统玻璃」掉回「自定义磨砂」。
+        gFloatBar.tintColor = UIColor.labelColor;
+        gFloatBar.unselectedItemTintColor = [UIColor colorWithWhite:0 alpha:0.55];
+    }
+
+    // 作为子视图挂在抖音底栏内：显隐/透明度/位置全部随父视图继承。
+    if (gFloatBar.superview != bar) [bar addSubview:gFloatBar];
+    if (bar.subviews.lastObject != gFloatBar) [bar bringSubviewToFront:gFloatBar];
+    if (!CGRectEqualToRect(gFloatBar.frame, bar.bounds)) gFloatBar.frame = bar.bounds;
+
+    // 深浅色：抖音深色皮肤下图标用白，浅色下用黑
+    UIUserInterfaceStyle style = QDFloatHostStyle(bar, buttons);
+    UIColor *ink = (style == UIUserInterfaceStyleDark) ? UIColor.whiteColor
+                                                       : [UIColor colorWithWhite:0 alpha:0.9];
+    if (![gFloatBar.tintColor isEqual:ink]) {
+        gFloatBar.tintColor = ink;
+        gFloatBar.unselectedItemTintColor = (style == UIUserInterfaceStyleDark)
+            ? [UIColor colorWithWhite:1 alpha:0.55]
+            : [UIColor colorWithWhite:0 alpha:0.55];
+    }
+
+    if (QDFloatSyncItems(controller, buttons)) {
+        // 重建过 items，让胶囊几何跟着重排一次
+        [gFloatBar setNeedsLayout];
+    }
+
+    QDFloatSetContentVisible(bar, buttons, NO);
+    gQDFloatActive = YES;
+    gQDBarGlassApplied = YES;
+}
+
 #pragma mark - 主流程
+
+static BOOL QDYTTShouldFloat(void) {
+    return QDYTTGlassEnabled() && QDYTTGlassFloatingEnabled() && QDYTTGlassNativeAvailable();
+}
 
 static void QDYTTApply(UIView *bar) {
     if (!bar) return;
     NSArray *buttons = QDYTTBarButtons(bar);
+    BOOL wantFloat = QDYTTShouldFloat();
 
-    if (!QDYTTGlassEnabled()) {
-        NSMutableArray<UIVisualEffectView *> *effects = [NSMutableArray array];
-        NSMutableArray<UIView *> *plains = [NSMutableArray array];
-        QDYTTCollectBackdrops(bar, effects, plains);
-        for (UIVisualEffectView *view in effects) QDYTTUnglassEffectView(view);
-        QDYTTRemoveOwnGlass(bar);
+    // 引擎切换时把另一套的痕迹清干净
+    if (!wantFloat && gQDFloatActive) {
+        QDFloatTearDown((AWENormalModeTabBar *)bar);
+    }
+    if (wantFloat && !gQDFloatActive) {
         QDYTTRestoreVeils(bar);
-        QDYTTUpdateCapsule(bar, buttons);
-        gQDBarGlassApplied = NO;
+        QDYTTRemoveOwnGlass(bar);
+    }
+
+    if (wantFloat) {
+        // 关掉面纱处理：悬浮条盖住全部内容，背景层 opacity 已归零
+        QDFloatUpdate((AWENormalModeTabBar *)bar);
+        gQDBarGlassApplied = gQDFloatActive;
+
+        if (gQDFloatActive && !gQDToastShown) {
+            gQDToastShown = YES;
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [DYYYUtils showToast:@"YTT 悬浮液态玻璃已生效"];
+            });
+        }
         return;
     }
 
+    // —— 引擎 B：原地换皮 ——
     NSMutableArray<UIVisualEffectView *> *effects = [NSMutableArray array];
     NSMutableArray<UIView *> *plains = [NSMutableArray array];
     QDYTTCollectBackdrops(bar, effects, plains);
 
     BOOL applied = NO;
-    for (UIVisualEffectView *view in effects) {
-        if (QDYTTGlassEffectView(view)) applied = YES;
-    }
-
-    if (!applied) {
-        // 底栏没有任何现成的毛玻璃层 —— 补一块，并且把压在上面的实色/渐变面纱摘掉，
-        // 否则玻璃被盖住，用户看到的还是「一点变化都没有」。
-        QDYTTEnsureOwnGlass(bar, buttons);
-        applied = YES;
-    }
-
-    if (QDYTTGlassGradientEnabled()) {
-        QDYTTNeutralizeVeils(bar);
+    if (QDYTTGlassEnabled()) {
+        for (UIVisualEffectView *view in effects) {
+            if (QDYTTGlassEffectView(view)) applied = YES;
+        }
+        if (!applied) {
+            // 底栏没有任何现成的毛玻璃层 —— 补一块，并且把压在上面的实色/渐变面纱摘掉，
+            // 否则玻璃被盖住，用户看到的还是「一点变化都没有」。
+            QDYTTEnsureOwnGlass(bar, buttons);
+            applied = YES;
+        }
+        if (QDYTTGlassGradientEnabled()) {
+            QDYTTNeutralizeVeils(bar);
+        } else {
+            QDYTTRestoreVeils(bar);
+        }
+        QDYTTUpdateCapsule(bar, buttons);
     } else {
+        for (UIVisualEffectView *view in effects) QDYTTUnglassEffectView(view);
+        QDYTTRemoveOwnGlass(bar);
         QDYTTRestoreVeils(bar);
+        QDYTTUpdateCapsule(bar, buttons);
     }
-
-    QDYTTUpdateCapsule(bar, buttons);
     gQDBarGlassApplied = applied;
 
-    if (applied && !gQDToastShown) {
+    if (applied && QDYTTGlassEnabled() && !gQDToastShown) {
         gQDToastShown = YES;
         dispatch_async(dispatch_get_main_queue(), ^{
             [DYYYUtils showToast:[NSString stringWithFormat:@"YTT 液态玻璃已生效 · %@", QDYTTGlassEngineName()]];
@@ -706,7 +1063,7 @@ static void QDYTTTick(UIView *hint) {
     CFTimeInterval now = CACurrentMediaTime();
     if (gQDLastTick > 0 && (now - gQDLastTick) < 0.25) return;
     gQDLastTick = now;
-    if (!QDYTTGlassEnabled() && !QDYTTGlassExtendEnabled()) {
+    if (!QDYTTGlassEnabled() && !gQDFloatActive) {
         if (gQDBar) QDYTTApply(gQDBar);
         return;
     }
@@ -714,6 +1071,7 @@ static void QDYTTTick(UIView *hint) {
     UIView *bar = hint;
     if (!bar) {
         bar = gQDBar;
+        // 只有已知底栏失效时才做全窗口扫描（贵），平时零扫描。
         if (!bar || bar.window == nil) bar = QDYTTFindBar();
     }
     if (bar) {
@@ -735,7 +1093,8 @@ void QDYTTGlassRefresh(void) {
         dispatch_async(dispatch_get_main_queue(), ^{ QDYTTGlassRefresh(); });
         return;
     }
-    QDYTTTick(nil);
+    gQDLastTick = 0;
+    QDYTTTick(gQDBar);
 }
 
 #pragma mark - 心跳
@@ -779,6 +1138,20 @@ static void QDYTTStartHeartbeat(void) {
     @try {
         QDYTTTick(self);
     } @catch (__unused NSException *exception) {}
+}
+
+// 抖音写角标的两个入口上立即重跑一次同步（收到推送时不伴随底栏重排）。
+%new
+- (id)p_showBadgeWithStyle:(unsigned long long)style count:(long long)count text:(id)text config:(id)config {
+    id result = %orig;
+    if (gFloatBar) QDFloatSyncBadges();
+    return result;
+}
+
+%new
+- (void)hideBadge {
+    %orig;
+    if (gFloatBar) QDFloatSyncBadges();
 }
 
 %end
