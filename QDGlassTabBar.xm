@@ -26,6 +26,7 @@
 #import <UIKit/UIKit.h>
 #import <QuartzCore/QuartzCore.h>
 #import <objc/runtime.h>
+#import <objc/message.h>
 
 #import "AwemeHeaders.h"
 #import "DYYYUtils.h"
@@ -70,13 +71,9 @@ static BOOL gQDBarGlassApplied = NO;
 static BOOL gQDToastShown = NO;
 static NSString *gQDLastFailReason = nil;
 
+// 同样不能依赖编译期 SDK 版本，直接问运行时有没有这个类。
 BOOL QDYTTGlassNativeAvailable(void) {
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 260000
-    if (@available(iOS 26.0, *)) {
-        return NSClassFromString(@"UIGlassEffect") != nil;
-    }
-#endif
-    return NO;
+    return NSClassFromString(@"UIGlassEffect") != nil;
 }
 
 NSString *QDYTTGlassEngineName(void) {
@@ -110,35 +107,38 @@ static UIColor *QDYTTAccentColor(void) {
     return [UIColor colorWithRed:0.15 green:0.65 blue:0.72 alpha:1.0];
 }
 
+// 重要：绝不要用 __IPHONE_OS_VERSION_MAX_ALLOWED 包这段逻辑。
+// 打包用的 SDK 通常还不到 iOS 26，一旦被编译期开关挡掉，这里就永远只会走降级毛玻璃，
+// 用户看到的就是「液态玻璃一点效果都没有」。全部改成运行时探测，SDK 版本无关。
 static UIVisualEffect *QDYTTMakeEffect(void) {
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 260000
-    if (@available(iOS 26.0, *)) {
-        Class glassClass = NSClassFromString(@"UIGlassEffect");
-        if (glassClass) {
-            UIGlassEffect *effect = nil;
-            BOOL clear = QDYTTGlassClearEnabled();
+    Class glassClass = NSClassFromString(@"UIGlassEffect");
+    if (glassClass) {
+        id effect = nil;
+        @try {
+            SEL styleSel = NSSelectorFromString(@"effectWithStyle:");
+            if ([glassClass respondsToSelector:styleSel]) {
+                // UIGlassEffectStyle: Regular = 0, Clear = 1
+                NSInteger style = QDYTTGlassClearEnabled() ? 1 : 0;
+                effect = ((id (*)(id, SEL, NSInteger))objc_msgSend)((id)glassClass, styleSel, style);
+            }
+            if (!effect) effect = [[glassClass alloc] init];
+        } @catch (__unused NSException *e) {
+            effect = nil;
+        }
 
-            if ([glassClass respondsToSelector:@selector(effectWithStyle:)]) {
-                UIGlassEffectStyle style = clear ? UIGlassEffectStyleClear : UIGlassEffectStyleRegular;
-                effect = [glassClass performSelector:@selector(effectWithStyle:) withObject:nil] ? nil : nil;
-                effect = ((id (*)(id, SEL, UIGlassEffectStyle))objc_msgSend)(
-                    glassClass, @selector(effectWithStyle:), style);
-            }
-            if (!effect && [glassClass respondsToSelector:@selector(effect)]) {
-                effect = [glassClass performSelector:@selector(effect)];
-            }
-            if (effect) {
-                if (clear) {
-                    effect.tintColor = [UIColor colorWithWhite:0 alpha:0.06];
+        if (effect) {
+            @try {
+                if (QDYTTGlassClearEnabled() && [effect respondsToSelector:@selector(setTintColor:)]) {
+                    [effect setValue:[UIColor colorWithWhite:0 alpha:0.06] forKey:@"tintColor"];
                 }
                 if ([effect respondsToSelector:@selector(setInteractive:)]) {
-                    effect.interactive = YES;   // 按压形变，这是液态玻璃的「活」感来源
+                    [effect setValue:@YES forKey:@"interactive"]; // 按压形变，液态玻璃的「活」感来源
                 }
-                return effect;
+            } @catch (__unused NSException *e) {
             }
+            return effect;
         }
     }
-#endif
     // 旧系统 / 取不到原生玻璃：系统级材质毛玻璃，观感最接近，且永远不会是「什么都没有」。
     return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
 }
