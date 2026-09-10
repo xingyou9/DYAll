@@ -1,10 +1,10 @@
 /**
- * 轻抖设置页 — 视觉完全重构
+ * 元抖设置页 — 视觉完全重构
  *
- * 仅作用于轻抖自己的设置页（通过关联对象标记隔离，不影响抖音原生设置页）：
+ * 仅作用于元抖自己的设置页（通过关联对象标记隔离，不影响抖音原生设置页）：
  *  - 整页液态玻璃背景（iOS 26+ 原生 UIGlassEffect，旧系统毛玻璃回退）
- *  - 大标题导航「轻抖设置」+ 浅青色调
- *  - 顶部 Hero 渐变头卡：轻抖徽标、版本徽章、模块统计、状态圆点
+ *  - 大标题导航「元抖设置」+ 浅青色调
+ *  - 顶部 Hero 渐变头卡：元抖徽标、版本徽章、模块统计、状态圆点
  *  - 深色模式全适配（动态颜色），约束布局无固定坐标，旋钮不破版
  */
 #import <Foundation/Foundation.h>
@@ -79,7 +79,7 @@ static UIView *QDBuildHeroHeader(CGFloat width) {
     [card.layer insertSublayer:grad atIndex:0];
     objc_setAssociatedObject(card, "qd_gradient", grad, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
-    // 轻抖徽标圆环
+    // 元抖徽标圆环
     UIView *logo = [[UIView alloc] init];
     logo.backgroundColor = [UIColor colorWithWhite:1 alpha:0.22];
     logo.layer.cornerRadius = 26;
@@ -97,7 +97,7 @@ static UIView *QDBuildHeroHeader(CGFloat width) {
 
     // 标题与副标题
     UILabel *title = [[UILabel alloc] init];
-    title.text = @"轻抖";
+    title.text = @"元抖";
     title.font = [UIFont systemFontOfSize:28 weight:UIFontWeightHeavy];
     title.textColor = UIColor.whiteColor;
     title.translatesAutoresizingMaskIntoConstraints = NO;
