@@ -26,10 +26,13 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <MediaPlayer/MediaPlayer.h>
+#import <StoreKit/StoreKit.h>
 #import <objc/runtime.h>
 
+#import "DYYYConstants.h"
 #import "DYYYSettingsHelper.h"
 #import "DYYYUtils.h"
+#import "QDGlassTabBar.h"
 
 #pragma mark - 偏好键
 
@@ -41,6 +44,8 @@ static NSString *const kQDBlockShake    = @"DYYYBlockShakeAd";
 static NSString *const kQDBlockCapture  = @"DYYYBlockCaptureDetection";
 static NSString *const kQDBlockTeen     = @"DYYYBlockTeenModeAlert";
 static NSString *const kQDDisableHaptic = @"DYYYDisableHaptic";
+static NSString *const kQDBlockReview   = @"DYYYBlockReviewPrompt";
+static NSString *const kQDBlockAppStore = @"DYYYBlockAppStoreJump";
 
 // 元抖自己的玻璃视图打这个 tag，避免被「关闭毛玻璃」误伤
 #define QD_KEEP_GLASS_TAG 993344
@@ -61,6 +66,8 @@ static void QDExtraRegisterDefaults(void) {
             kQDBlockCapture  : @YES,
             kQDBlockTeen     : @YES,
             kQDDisableHaptic : @NO,
+            kQDBlockReview   : @YES,
+            kQDBlockAppStore : @NO,
         }];
     });
 }
@@ -260,6 +267,28 @@ static void QDDisableRemoteCommands(void) {
     }
 }
 
+- (void)openURL:(NSURL *)url options:(NSDictionary<UIApplicationOpenExternalURLOptionsKey, id> *)options completionHandler:(void (^)(BOOL success))completion {
+    if (QDBool(kQDBlockAppStore) && url) {
+        NSString *s = url.absoluteString.lowercaseString;
+        if ([s hasPrefix:@"itms-apps"] || [s containsString:@"apps.apple.com"]) {
+            [DYYYUtils showToast:@"已拦截 App Store 跳转"];
+            if (completion) completion(NO);
+            return;
+        }
+    }
+    %orig;
+}
+
+%end
+
+// 抖音常在刷到一定次数时请求系统评分弹窗，直接掐掉
+%hook SKStoreReviewController
+
++ (void)requestReview {
+    if (QDBool(kQDBlockReview)) return;
+    %orig;
+}
+
 %end
 
 #pragma mark - 设置页
@@ -277,6 +306,8 @@ static NSArray<NSArray<NSString *> *> *QDSystemSpecs(void) {
             @[ @"屏蔽录屏检测", kQDBlockCapture, @"让抖音检测不到正在录屏 / 截屏" ],
             @[ @"拦截青少年弹窗", kQDBlockTeen, @"自动拦掉青少年模式相关弹窗" ],
             @[ @"关闭触感反馈", kQDDisableHaptic, @"关掉震动反馈（省电，手感偏生硬）" ],
+            @[ @"拦截评分弹窗", kQDBlockReview, @"阻止抖音请求系统打分弹窗" ],
+            @[ @"拦截 App Store 跳转", kQDBlockAppStore, @"阻止抖音把人带到 App Store" ],
         ];
     });
     return specs;
@@ -309,7 +340,52 @@ static NSArray<NSArray<NSString *> *> *QDSystemSpecs(void) {
         [DYYYSettingsHelper createSectionWithTitle:@"灵动岛与性能"
                                        footerTitle:@"灵动岛屏蔽默认开启：抖音更新「正在播放」信息时会被丢弃，灵动岛不再展开。除「减少预加载」外，全部改动即时生效。"
                                              items:sysItems];
-    return [DYYYSettingsHelper createSubSettingsViewController:@"系统与性能" sections:@[ sysSection ]];
+
+    // —— 运行诊断（只读）——
+    static NSArray<NSString *> *diagKeys = nil;
+    static dispatch_once_t diagOnce;
+    dispatch_once(&diagOnce, ^{
+        diagKeys = @[ @"DYYYNoAds", @"DYYYisEnableFullScreen", @"DYYYLongPressCopyTextEnabled",
+                      @"DYYYisEnableCommentBlur", @"DYYYEnableFloatSpeedButton", @"DYYYEnableFloatClearButton",
+                      @"DYYYHideDanmuButton", @"DYYYHideSearchBubble", @"DYYYisSkipLive",
+                      @"DYYYBlockDynamicIsland", @"YTT.glass" ];
+    });
+    NSInteger enabled = 0;
+    for (NSString *k in diagKeys) {
+        if ([[NSUserDefaults standardUserDefaults] boolForKey:k]) enabled++;
+    }
+
+    NSDictionary *info = [[NSBundle mainBundle] infoDictionary];
+    NSString *dyVersion = [NSString stringWithFormat:@"%@ (%@)",
+                           info[@"CFBundleShortVersionString"] ?: @"?",
+                           info[@"CFBundleVersion"] ?: @"?"];
+
+    NSArray *pairs = @[
+        @[ @"抖音版本", dyVersion ],
+        @[ @"元抖版本", DYYY_VERSION ],
+        @[ @"玻璃引擎", QDYTTGlassEngineName() ],
+        @[ @"底栏接管", QDYTTGlassBarStatus() ],
+        @[ @"功能开启", [NSString stringWithFormat:@"%ld / %lu 项", (long)enabled, (unsigned long)diagKeys.count] ],
+    ];
+
+    NSMutableArray<AWESettingItemModel *> *diagItems = [NSMutableArray array];
+    for (NSArray<NSString *> *pair in pairs) {
+        AWESettingItemModel *item = [[NSClassFromString(@"AWESettingItemModel") alloc] init];
+        item.identifier = [@"diag." stringByAppendingString:pair[0]];
+        item.title = pair[0];
+        item.detail = pair[1];
+        item.type = 0;
+        item.cellType = 26;
+        item.colorStyle = 0;
+        item.isEnable = NO;
+        [diagItems addObject:item];
+    }
+    AWESettingSectionModel *diagSection =
+        [DYYYSettingsHelper createSectionWithTitle:@"运行诊断"
+                                       footerTitle:@"玻璃引擎与底栏接管为实时状态。若显示「未接管」，回到首页停留 1–2 秒后再进来看。"
+                                             items:diagItems];
+
+    return [DYYYSettingsHelper createSubSettingsViewController:@"系统与性能" sections:@[ sysSection, diagSection ]];
 }
 
 @end
