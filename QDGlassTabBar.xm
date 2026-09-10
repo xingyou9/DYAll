@@ -80,6 +80,7 @@ static BOOL gQDBarGlassApplied = NO;
 static BOOL gQDToastShown = NO;
 static NSString *gQDLastFailReason = nil;
 static BOOL gQDFloatActive = NO;      // 当前是否处于悬浮胶囊引擎
+static CFTimeInterval gQDLastTick = 0;  // 底栏树遍历节流时间戳
 
 // —— 悬浮胶囊引擎的运行时状态 ——
 static UITabBar *gFloatBar = nil;                 // 自建的系统 UITabBar（iOS 26+ 自带液态玻璃胶囊）
@@ -1068,7 +1069,6 @@ static void QDYTTTick(UIView *hint) {
 
     // 节流：底栏 layoutSubviews 是逐帧路径，树遍历再便宜也不能每帧做。
     // 0.25s 一次足够跟上切换 tab / 旋转 / 深浅色切换，而且肉眼无感。
-    static CFTimeInterval gQDLastTick = 0;
     CFTimeInterval now = CACurrentMediaTime();
     if (gQDLastTick > 0 && (now - gQDLastTick) < 0.25) return;
     gQDLastTick = now;
