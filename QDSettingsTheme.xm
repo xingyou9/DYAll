@@ -22,6 +22,7 @@
 #import "AwemeHeaders.h"
 #import "DYYYConstants.h"
 #import "DYYYSettingsHelper.h"
+#import "DYYYUtils.h"
 #import "QDGlassTabBar.h"
 #import "QDExtra.h"
 
