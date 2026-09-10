@@ -162,6 +162,19 @@ static BOOL QDYTTContainsControl(UIView *root, int depth) {
 }
 
 /// 底栏里的 tab 按钮数组。KVC 优先，失败再按类名扫子树。
+/// 底栏按钮必须按视觉左右顺序排列：KVC 拿到的数组通常有序，但 BFS 兜底路径
+/// 按层级遍历，顺序可能与屏幕上不一致——顺序错了「朋友 / 消息」就会左右错位。
+static NSArray *QDYTTButtonsSortedByX(NSArray *buttons) {
+    if (buttons.count < 2) return buttons;
+    return [buttons sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
+        CGFloat ax = [a isKindOfClass:[UIView class]] ? ((UIView *)a).frame.origin.x : 0;
+        CGFloat bx = [b isKindOfClass:[UIView class]] ? ((UIView *)b).frame.origin.x : 0;
+        if (ax < bx) return NSOrderedAscending;
+        if (ax > bx) return NSOrderedDescending;
+        return NSOrderedSame;
+    }];
+}
+
 static NSArray *QDYTTBarButtons(UIView *bar) {
     static NSArray<NSString *> *keys = nil;
     static dispatch_once_t once;
@@ -171,12 +184,12 @@ static NSArray *QDYTTBarButtons(UIView *bar) {
 
     for (NSString *key in keys) {
         id value = QDYTTKVC(bar, key);
-        if ([value isKindOfClass:[NSArray class]] && [(NSArray *)value count] >= 2) return value;
+        if ([value isKindOfClass:[NSArray class]] && [(NSArray *)value count] >= 2) return QDYTTButtonsSortedByX(value);
     }
     id controller = QDYTTKVC(bar, @"yy_viewController");
     for (NSString *key in keys) {
         id value = QDYTTKVC(controller, key);
-        if ([value isKindOfClass:[NSArray class]] && [(NSArray *)value count] >= 2) return value;
+        if ([value isKindOfClass:[NSArray class]] && [(NSArray *)value count] >= 2) return QDYTTButtonsSortedByX(value);
     }
 
     NSMutableArray *found = [NSMutableArray array];
@@ -198,7 +211,7 @@ static NSArray *QDYTTBarButtons(UIView *bar) {
         [stack removeObjectsInRange:NSMakeRange(0, count)];
         depth++;
     }
-    return found.count >= 2 ? found : nil;
+    return found.count >= 2 ? QDYTTButtonsSortedByX(found) : nil;
 }
 
 /// 底栏里子视图的「内容区」——按钮所在的容器，玻璃要垫在它下面。
@@ -820,6 +833,23 @@ static void QDFloatSyncBadges(void) {
 static void QDFloatSetContentVisible(AWENormalModeTabBar *bar, NSArray *buttons, BOOL visible) {
     if (!bar) return;
     float opacity = visible ? 1.0f : 0.0f;
+
+    // 底栏自身可能是纯黑实色背景，只隐掉子视图不够 —— 胶囊会压在一块黑底上，
+    // 看起来就是「有玻璃但底栏还是黑的」。这里把自背景也清掉，退出时原样还原。
+    if (!visible) {
+        UIColor *bg = bar.backgroundColor;
+        if (bg && CGColorGetAlpha(bg.CGColor) > 0.01) {
+            objc_setAssociatedObject(bar, &kQDOrigBGKey, bg, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            bar.backgroundColor = UIColor.clearColor;
+        }
+    } else {
+        UIColor *orig = objc_getAssociatedObject(bar, &kQDOrigBGKey);
+        if (orig) {
+            bar.backgroundColor = orig;
+            objc_setAssociatedObject(bar, &kQDOrigBGKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+    }
+
     NSArray *backdrops = @[ QDYTTKVC(bar, @"backgroundView") ?: [NSNull null],
                             QDYTTKVC(bar, @"awe_blurView") ?: [NSNull null],
                             QDYTTKVC(bar, @"separatorLine") ?: [NSNull null],

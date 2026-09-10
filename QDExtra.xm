@@ -283,7 +283,8 @@ static UIControl *QDFindSkipControlInView(UIView *root, int depth) {
         }
         if (t.length) {
             NSString *s = [t stringByReplacingOccurrencesOfString:@" " withString:@""];
-            if ([s containsString:@"跳过"] || [s caseInsensitiveContainsString:@"skip"]) {
+            if ([s containsString:@"跳过"]
+                || [s rangeOfString:@"skip" options:NSCaseInsensitiveSearch].location != NSNotFound) {
                 CGRect r = [c convertRect:c.bounds toView:nil];
                 CGRect sb = [UIScreen mainScreen].bounds;
                 if (CGRectIntersectsRect(r, sb) && c.window) return c;
