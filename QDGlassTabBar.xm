@@ -1140,20 +1140,6 @@ static void QDYTTStartHeartbeat(void) {
     } @catch (__unused NSException *exception) {}
 }
 
-// 抖音写角标的两个入口上立即重跑一次同步（收到推送时不伴随底栏重排）。
-%new
-- (id)p_showBadgeWithStyle:(unsigned long long)style count:(long long)count text:(id)text config:(id)config {
-    id result = %orig;
-    if (gFloatBar) QDFloatSyncBadges();
-    return result;
-}
-
-%new
-- (void)hideBadge {
-    %orig;
-    if (gFloatBar) QDFloatSyncBadges();
-}
-
 %end
 
 // 冷启动时抖音的底栏还没进窗口，先起心跳，等它出现。
