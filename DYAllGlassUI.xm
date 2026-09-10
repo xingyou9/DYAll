@@ -7,6 +7,7 @@
  */
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import "DYYYSettingViewController.h"
 
 static BOOL DYAllGlassPrefEnabled(void) {
     // 默认开启液态玻璃；写入 DYAllGlassUIDisabled = YES 可关闭
