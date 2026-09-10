@@ -220,6 +220,7 @@ extern "C"
 #endif
 void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
     AWESettingBaseViewController *settingsVC = [[%c(AWESettingBaseViewController) alloc] init];
+    objc_setAssociatedObject(settingsVC, "qd_is_qingdou_page", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     // 等待视图加载并使用KVO安全访问属性
     dispatch_async(dispatch_get_main_queue(), ^{
       if ([settingsVC.view isKindOfClass:[UIView class]]) {
