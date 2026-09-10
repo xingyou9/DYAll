@@ -3562,11 +3562,8 @@ speedSettingsItem.detail = trimmedText;
     aboutItem.isEnable = YES;
     aboutItem.cellTappedBlock = ^{
       [DYYYSettingsHelper showAboutDialog:@"关于轻抖"
-                                  message:@"版本: " DYYY_VERSION @"
-
-"
-                                          @"轻抖 · 抖音增强聚合版
-液态玻璃界面"
+                                  message:@"版本: " DYYY_VERSION @"\n\n"
+                                          @"轻抖 · 抖音增强聚合版\n液态玻璃界面"
                                 onConfirm:nil];
     };
     [aboutItems addObject:aboutItem];
