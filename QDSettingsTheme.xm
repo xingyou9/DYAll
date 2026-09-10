@@ -41,7 +41,7 @@ static UITableView *QDFindTableView(UIView *view, int depth) {
 static NSInteger QDCountEnabledFeatures(void) {
     NSArray *keys = @[@"DYYYNoAds", @"DYYYisEnableFullScreen", @"DYYYLongPressCopyTextEnabled",
                       @"DYYYisEnableCommentBlur", @"DYYYEnableFloatSpeedButton", @"DYYYEnableFloatClearButton",
-                      @"DYKillerGlassTabBar", @"DYKillerCommentGlass", @"DYKillerHideMusicInfo"];
+                      @"DYYYHideDanmuButton", @"DYYYHideSearchBubble", @"DYYYisSkipLive"];
     NSInteger n = 0;
     for (NSString *k in keys) {
         if ([[NSUserDefaults standardUserDefaults] boolForKey:k]) n++;
@@ -89,7 +89,7 @@ static UIView *QDBuildHeroHeader(CGFloat width) {
     [card addSubview:logo];
 
     UILabel *logoText = [[UILabel alloc] init];
-    logoText.text = @"轻";
+    logoText.text = @"元";
     logoText.font = [UIFont systemFontOfSize:26 weight:UIFontWeightBold];
     logoText.textColor = UIColor.whiteColor;
     logoText.translatesAutoresizingMaskIntoConstraints = NO;
@@ -102,13 +102,6 @@ static UIView *QDBuildHeroHeader(CGFloat width) {
     title.textColor = UIColor.whiteColor;
     title.translatesAutoresizingMaskIntoConstraints = NO;
     [card addSubview:title];
-
-    UILabel *sub = [[UILabel alloc] init];
-    sub.text = @"抖音增强聚合版 · 液态玻璃界面";
-    sub.font = [UIFont systemFontOfSize:13 weight:UIFontWeightMedium];
-    sub.textColor = [UIColor colorWithWhite:1 alpha:0.85];
-    sub.translatesAutoresizingMaskIntoConstraints = NO;
-    [card addSubview:sub];
 
     UILabel *stat = [[UILabel alloc] init];
     NSInteger enabled = QDCountEnabledFeatures();
@@ -150,10 +143,8 @@ static UIView *QDBuildHeroHeader(CGFloat width) {
         [logoText.centerYAnchor constraintEqualToAnchor:logo.centerYAnchor],
         [title.leadingAnchor constraintEqualToAnchor:logo.trailingAnchor constant:16],
         [title.topAnchor constraintEqualToAnchor:card.topAnchor constant:24],
-        [sub.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
-        [sub.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:6],
         [stat.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
-        [stat.topAnchor constraintEqualToAnchor:sub.bottomAnchor constant:6],
+        [stat.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:6],
         [badge.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-16],
         [badge.topAnchor constraintEqualToAnchor:card.topAnchor constant:16],
         [badge.widthAnchor constraintEqualToConstant:56],
@@ -172,8 +163,8 @@ static UIView *QDBuildHeroHeader(CGFloat width) {
     %orig;
     if (!QDIsQingdouPage(self)) return;
 
-    self.title = @"轻抖设置";
-    self.navigationItem.title = @"轻抖设置";
+    self.title = @"元抖设置";
+    self.navigationItem.title = @"元抖设置";
     self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeAlways;
     if (self.navigationController) {
         self.navigationController.navigationBar.prefersLargeTitles = YES;

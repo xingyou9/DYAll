@@ -1,5 +1,5 @@
 /**
- * 轻抖助手 — 悬浮快捷面板
+ * 元抖助手 — 悬浮快捷面板
  *
  * 交互参考抖音助手的"三指长按调出"设计：
  *  - 任意界面三指长按屏幕调出液态玻璃快捷面板
@@ -68,7 +68,7 @@ static NSArray<NSArray<NSString *> *> *QDPanelGroups(void) {
     [self.view addSubview:card];
 
     UILabel *title = [[UILabel alloc] init];
-    title.text = @"轻抖助手";
+    title.text = @"元抖助手";
     title.font = [UIFont boldSystemFontOfSize:19];
     title.textAlignment = NSTextAlignmentCenter;
     title.translatesAutoresizingMaskIntoConstraints = NO;

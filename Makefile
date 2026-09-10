@@ -36,11 +36,10 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = DYAll
 
-DK_SRC_FILES := $(shell find src -type f \( -name "*.m" -o -name "*.mm" -o -name "*.x" -o -name "*.xm" -o -name "*.c" -o -name "*.cc" -o -name "*.cpp" \) | sort)
-DYAll_FILES = QDAssistant.xm QDSettingsTheme.xm DYAllGlassUI.xm DYYY.xm $(DK_SRC_FILES) DYYYFloatClearButton.xm DYYYFloatSpeedButton.m DYYYSettings.xm DYYYABTestHook.xm DYYYLongPressPanel.xm DYYYSettingsHelper.m DYYYImagePickerDelegate.m DYYYBackupPickerDelegate.m DYYYSettingViewController.m DYYYBottomAlertView.m DYYYCustomInputView.m DYYYOptionsSelectionView.m DYYYIconOptionsDialogView.m DYYYAboutDialogView.m DYYYKeywordListView.m DYYYFilterSettingsView.m DYYYConfirmCloseView.m DYYYToast.m DYYYManager.m DYYYUtils.m CityManager.m AWMSafeDispatchTimer.m
-DYAll_CFLAGS = -fobjc-arc -w -DDK_VERSION=@\"0.5.8\" $(addprefix -I,$(shell find src -type d | sort))
-DYAll_LDFLAGS = -weak_framework AVFAudio -lz
-DYAll_FRAMEWORKS = CoreAudio UIKit Foundation QuartzCore CoreGraphics PhotosUI AudioToolbox AVFoundation CoreMedia MediaToolbox Accelerate
+DYAll_FILES = QDAssistant.xm QDSettingsTheme.xm DYAllGlassUI.xm DYYY.xm DYYYFloatClearButton.xm DYYYFloatSpeedButton.m DYYYSettings.xm DYYYABTestHook.xm DYYYLongPressPanel.xm DYYYSettingsHelper.m DYYYImagePickerDelegate.m DYYYBackupPickerDelegate.m DYYYSettingViewController.m DYYYBottomAlertView.m DYYYCustomInputView.m DYYYOptionsSelectionView.m DYYYIconOptionsDialogView.m DYYYAboutDialogView.m DYYYKeywordListView.m DYYYFilterSettingsView.m DYYYConfirmCloseView.m DYYYToast.m DYYYManager.m DYYYUtils.m CityManager.m AWMSafeDispatchTimer.m
+DYAll_CFLAGS = -fobjc-arc -w
+DYAll_LDFLAGS = -weak_framework AVFAudio
+DYAll_FRAMEWORKS = CoreAudio
 CXXFLAGS += -std=c++11
 CCFLAGS += -std=c++11
 DYAll_LOGOS_DEFAULT_GENERATOR = internal

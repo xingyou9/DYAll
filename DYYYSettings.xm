@@ -99,7 +99,7 @@ static void DYYYRemoveRemoteConfigObserver(void) {
         UIButton *dyyyBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         dyyyBtn.tag = 232323;
         dyyyBtn.accessibilityLabel = @"DYYYSettingsButton";
-        [dyyyBtn setTitle:@"轻抖" forState:UIControlStateNormal];
+        [dyyyBtn setTitle:@"元抖" forState:UIControlStateNormal];
 
         UIColor *titleColor = [DYYYUtils isDarkMode] ? [UIColor whiteColor] : [UIColor blackColor];
         [dyyyBtn setTitleColor:titleColor forState:UIControlStateNormal];
@@ -150,7 +150,7 @@ static void DYYYRemoveRemoteConfigObserver(void) {
         UIButton *dyyyBtn = [UIButton buttonWithType:UIButtonTypeSystem];
         dyyyBtn.tag = 232323;
         dyyyBtn.accessibilityLabel = @"DYYYSettingsButton";
-        [dyyyBtn setTitle:@"轻抖" forState:UIControlStateNormal];
+        [dyyyBtn setTitle:@"元抖" forState:UIControlStateNormal];
 
         UIColor *titleColor = [DYYYUtils isDarkMode] ? [UIColor whiteColor] : [UIColor blackColor];
         [dyyyBtn setTitleColor:titleColor forState:UIControlStateNormal];
@@ -2155,7 +2155,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
           NSFileManager *fileManager = [NSFileManager defaultManager];
           NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
           NSString *documentsDirectory = [paths firstObject];
-          NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"轻抖"];
+          NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"元抖"];
           NSString *jsonFilePath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
 
           NSString *loadingStatus = [DYYYABTestHook isLocalConfigLoaded] ? @"已加载：" : @"未加载：";
@@ -2460,7 +2460,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
                 NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
                 NSString *documentsDirectory = [paths firstObject];
 
-                NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"轻抖"];
+                NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"元抖"];
                 NSString *jsonFilePath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
 
                 NSData *jsonData = [NSData dataWithContentsOfFile:jsonFilePath];
@@ -2539,7 +2539,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
 
                       NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
                       NSString *documentsDirectory = [paths firstObject];
-                      NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"轻抖"];
+                      NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"元抖"];
                       NSURL *destinationURL = [NSURL fileURLWithPath:[dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"]];
 
                       NSFileManager *fileManager = [NSFileManager defaultManager];
@@ -2609,7 +2609,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
                     return;
                 NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
                 NSString *documentsDirectory = [paths firstObject];
-                NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"轻抖"];
+                NSString *dyyyFolderPath = [documentsDirectory stringByAppendingPathComponent:@"元抖"];
                 NSString *configPath = [dyyyFolderPath stringByAppendingPathComponent:@"abtest_data_fixed.json"];
 
                 if ([[NSFileManager defaultManager] fileExistsAtPath:configPath]) {
@@ -3226,7 +3226,7 @@ speedSettingsItem.detail = trimmedText;
 
       // 查找并添加图标文件
       NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-      NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"轻抖"];
+      NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"元抖"];
 
       NSArray *iconFileNames = @[ @"like_before.png", @"like_after.png", @"comment.png", @"unfavorite.png", @"favorite.png", @"share.png", @"tab_plus.png", @"qingping.gif" ];
 
@@ -3339,7 +3339,7 @@ speedSettingsItem.detail = trimmedText;
           NSDictionary *iconBase64Dict = dyyySettings[@"DYYYIconsBase64"];
           if (iconBase64Dict && [iconBase64Dict isKindOfClass:[NSDictionary class]]) {
               NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-              NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"轻抖"];
+              NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"元抖"];
               NSFileManager *fileManager = [NSFileManager defaultManager];
 
               if (![fileManager fileExistsAtPath:dyyyFolderPath]) {
@@ -3562,9 +3562,8 @@ speedSettingsItem.detail = trimmedText;
     aboutItem.colorStyle = 0;
     aboutItem.isEnable = YES;
     aboutItem.cellTappedBlock = ^{
-      [DYYYSettingsHelper showAboutDialog:@"关于轻抖"
+      [DYYYSettingsHelper showAboutDialog:@"关于元抖"
                                   message:@"版本: " DYYY_VERSION @"\n\n"
-                                          @"轻抖 · 抖音增强聚合版\n液态玻璃界面"
                                 onConfirm:nil];
     };
     [aboutItems addObject:aboutItem];
@@ -3599,7 +3598,7 @@ speedSettingsItem.detail = trimmedText;
         dyyyItem.title = DYYY_NAME;
         dyyyItem.detail = DYYY_VERSION;
         dyyyItem.type = 0;
-        dyyyItem.svgIconImageName = @"ic_sapling_outlined";
+        dyyyItem.svgIconImageName = @"ic_gearsimplify_outlined_20";
         dyyyItem.cellType = 26;
         dyyyItem.colorStyle = 2;
         dyyyItem.isEnable = YES;
@@ -3613,7 +3612,7 @@ speedSettingsItem.detail = trimmedText;
         newSection.itemArray = @[ dyyyItem ];
         newSection.type = 0;
         newSection.sectionHeaderHeight = 40;
-        newSection.sectionHeaderTitle = @"轻抖";
+        newSection.sectionHeaderTitle = @"元抖";
 
         NSMutableArray *newSections = [NSMutableArray arrayWithArray:originalSections];
         [newSections insertObject:newSection atIndex:0];

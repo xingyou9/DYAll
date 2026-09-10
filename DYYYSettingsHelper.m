@@ -532,7 +532,7 @@ static void showIconOptionsDialog(NSString *title, UIImage *previewImage, NSStri
     item.title = title;
 
     NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-    NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"轻抖"];
+    NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"元抖"];
     NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
 
     BOOL fileExists = [[NSFileManager defaultManager] fileExistsAtPath:imagePath];
@@ -590,7 +590,7 @@ static void showIconOptionsDialog(NSString *title, UIImage *previewImage, NSStri
 
               dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
                 NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-                NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"轻抖"];
+                NSString *dyyyFolderPath = [documentsPath stringByAppendingPathComponent:@"元抖"];
                 NSString *imagePath = [dyyyFolderPath stringByAppendingPathComponent:saveFilename];
                 NSData *imageData = [NSData dataWithContentsOfURL:originalImageURL];
 

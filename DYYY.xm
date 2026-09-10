@@ -102,7 +102,7 @@ static NSString *DYYYCustomAssetsDirectory(void) {
 
     dispatch_once(&onceToken, ^{
       NSString *documentsPath = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-      customDirectory = [documentsPath stringByAppendingPathComponent:@"轻抖"];
+      customDirectory = [documentsPath stringByAppendingPathComponent:@"元抖"];
       [[NSFileManager defaultManager] createDirectoryAtPath:customDirectory withIntermediateDirectories:YES attributes:nil error:nil];
     });
 
