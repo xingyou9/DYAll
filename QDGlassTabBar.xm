@@ -38,6 +38,7 @@
 #import "DYYYUtils.h"
 #import "DYYYPerfMonitor.h"
 #import "DYYYModeManager.h"
+#import "DYYYFeatureRegistry.h"
 
 #pragma mark - 偏好键
 

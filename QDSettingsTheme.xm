@@ -34,6 +34,7 @@
 #import "DYYYModeManager.h"
 #import "DYYYPerfMonitor.h"
 #import "DYYDCenterPages.h"
+#import "DYYDDesign.h"
 #import "QDGlassTabBar.h"
 #import "QDExtra.h"
 
@@ -219,6 +220,20 @@ static NSInteger QDCountEnabled(void) {
 
 static QDHeroSearch *gQDHeroSearch = nil;
 
+// 5.0 模糊匹配：needle 的每个字符按顺序出现在 hay 中即命中
+static BOOL QDFuzzyMatch(NSString *hay, NSString *needle) {
+    if (!hay || !needle) return NO;
+    NSUInteger cursor = 0;
+    for (NSUInteger i = 0; i < needle.length; i++) {
+        NSRange found = [hay rangeOfString:[needle substringWithRange:NSMakeRange(i, 1)]
+                                   options:NSCaseInsensitiveSearch
+                                     range:NSMakeRange(cursor, hay.length - MIN(cursor, hay.length))];
+        if (found.location == NSNotFound) return NO;
+        cursor = found.location + 1;
+    }
+    return YES;
+}
+
 @implementation QDHeroSearch
 
 - (void)attachTo:(UIViewController *)owner field:(UITextField *)field {
@@ -269,17 +284,13 @@ static QDHeroSearch *gQDHeroSearch = nil;
     self.results = [DYYYSettingsSearchIndex() filteredArrayUsingPredicate:predicate];
     // 5.0 模糊搜索：连续包含没命中时，退化为"字符子序列"匹配（如搜"下质"也能命中"下载质量"）
     if (self.results.count == 0) {
-        NSPredicate *fuzzy = [NSPredicate predicateWithBlock:^BOOL(id item, NSDictionary *bindings) {
-            NSString *hay = [NSString stringWithFormat:@"%@%@%@%@", item[@"title"] ?: @"", item[@"sub"] ?: @"", item[@"id"] ?: @"", item[@"cat"] ?: @"";
-            NSUInteger cursor = 0;
-            for (NSUInteger i = 0; i < text.length; i++) {
-                NSRange found = [hay rangeOfString:[text substringWithRange:NSMakeRange(i, 1)] options:NSCaseInsensitiveSearch range:NSMakeRange(cursor, hay.length - cursor)];
-                if (found.location == NSNotFound) return NO;
-                cursor = found.location + 1;
-            }
-            return YES;
-        }];
-        self.results = [DYYYSettingsSearchIndex() filteredArrayUsingPredicate:fuzzy];
+        NSMutableArray *fuzzyMatches = [NSMutableArray array];
+        for (NSDictionary *item in DYYYSettingsSearchIndex()) {
+            NSString *hay = [NSString stringWithFormat:@"%@%@%@%@",
+                item[@"title"] ?: @"", item[@"sub"] ?: @"", item[@"id"] ?: @"", item[@"cat"] ?: @""];
+            if (QDFuzzyMatch(hay, text)) [fuzzyMatches addObject:item];
+        }
+        self.results = fuzzyMatches;
     }
     [self reposition];
     [self.table reloadData];
