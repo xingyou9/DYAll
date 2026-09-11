@@ -63,6 +63,11 @@ static AWESettingSectionModel *DYYDSection(NSString *title, NSString *footer, NS
     return [DYYYSettingsHelper createSectionWithTitle:title footerTitle:footer items:items];
 }
 
+#pragma mark - 主类
+
+@implementation DYYDCenterPages
+@end
+
 #pragma mark - 模式中心
 
 @implementation DYYDCenterPages (Mode)
