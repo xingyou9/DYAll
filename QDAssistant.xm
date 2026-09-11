@@ -293,7 +293,12 @@ static NSArray<NSString *> *QDTransparencyKeys(void) {
     if ([QDTransparencyKeys() containsObject:key]) {
         [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYGlobalTransparencyDidChangeNotification" object:nil];
     }
-    [DYYYUtils showToast:[NSString stringWithFormat:@"%@ 已%@", key, sw.on ? @"开启" : @"关闭"]];
+    // 提示用功能名，不暴露偏好键名
+    NSString *label = key;
+    for (NSArray<NSString *> *row in QDPanelRows()) {
+        if ([row[1] isEqualToString:key]) { label = row[0]; break; }
+    }
+    [DYYYUtils showToast:[NSString stringWithFormat:@"%@ 已%@", label, sw.on ? @"开启" : @"关闭"]];
 }
 
 #pragma mark - 动作

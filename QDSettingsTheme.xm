@@ -360,6 +360,94 @@ static QDHeroSearch *gQDHeroSearch = nil;
 
 static QDHeroStatusTap *gQDStatusTap = nil;
 
+#pragma mark - 自绘线性图标（与设置行黑色线稿风格一致，替代 emoji）
+
+static UIImage *QDLineIconNamed(NSString *kind) {
+    static NSMutableDictionary *cache;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ cache = [NSMutableDictionary dictionary]; });
+    UIImage *cached = cache[kind];
+    if (cached) return cached;
+
+    UIGraphicsImageRendererFormat *fmt = [[UIGraphicsImageRendererFormat alloc] init];
+    fmt.scale = [UIScreen mainScreen].scale;
+    fmt.opaque = NO;
+    UIGraphicsImageRenderer *r = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(18, 18) format:fmt];
+    UIImage *img = [r imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        [UIColor.blackColor setStroke];
+        [UIColor.blackColor setFill];
+        UIBezierPath *p = [UIBezierPath bezierPath];
+        p.lineCapStyle = kCGLineCapRound;
+        p.lineJoinStyle = kCGLineJoinRound;
+        [p setLineWidth:1.7];
+
+        if ([kind isEqualToString:@"shield"]) {            // Hook 状态
+            [p moveToPoint:CGPointMake(9, 1.8)];
+            [p addLineToPoint:CGPointMake(15, 4)];
+            [p addLineToPoint:CGPointMake(15, 8.6)];
+            [p addCurveToPoint:CGPointMake(9, 16.2) controlPoint1:CGPointMake(15, 12.2) controlPoint2:CGPointMake(12.6, 15.1)];
+            [p addCurveToPoint:CGPointMake(3, 8.6) controlPoint1:CGPointMake(5.4, 15.1) controlPoint2:CGPointMake(3, 12.2)];
+            [p addLineToPoint:CGPointMake(3, 4)];
+            [p closePath];
+            [p stroke];
+        } else if ([kind isEqualToString:@"bolt"]) {       // 已启用功能
+            [p moveToPoint:CGPointMake(10.2, 1.5)];
+            [p addLineToPoint:CGPointMake(4.2, 10)];
+            [p addLineToPoint:CGPointMake(8.2, 10)];
+            [p addLineToPoint:CGPointMake(7, 16.5)];
+            [p addLineToPoint:CGPointMake(13.8, 7.6)];
+            [p addLineToPoint:CGPointMake(9.4, 7.6)];
+            [p closePath];
+            [p fill];
+        } else if ([kind isEqualToString:@"glass"]) {      // 玻璃引擎
+            UIBezierPath *box = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(2.5, 2.5, 13, 13) cornerRadius:4.5];
+            box.lineCapStyle = kCGLineCapRound;
+            [box setLineWidth:1.7];
+            [box stroke];
+            [p moveToPoint:CGPointMake(6, 12.2)];
+            [p addLineToPoint:CGPointMake(12.2, 6)];
+            [p stroke];
+        } else if ([kind isEqualToString:@"phone"]) {      // 系统 / 抖音
+            UIBezierPath *body = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(5.2, 1.8, 7.6, 14.4) cornerRadius:2];
+            body.lineCapStyle = kCGLineCapRound;
+            [body setLineWidth:1.7];
+            [body stroke];
+            [p moveToPoint:CGPointMake(7.6, 13.6)];
+            [p addLineToPoint:CGPointMake(10.4, 13.6)];
+            [p stroke];
+        } else if ([kind isEqualToString:@"box"]) {        // 下载任务
+            [p moveToPoint:CGPointMake(9, 2.2)];
+            [p addLineToPoint:CGPointMake(9, 10.6)];
+            [p stroke];
+            [p removeAllPoints];
+            [p moveToPoint:CGPointMake(5.4, 7.6)];
+            [p addLineToPoint:CGPointMake(9, 11.2)];
+            [p addLineToPoint:CGPointMake(12.6, 7.6)];
+            [p stroke];
+            [p removeAllPoints];
+            [p moveToPoint:CGPointMake(3, 12.4)];
+            [p addLineToPoint:CGPointMake(3, 14.2)];
+            [p addCurveToPoint:CGPointMake(4.8, 16) controlPoint1:CGPointMake(3, 15.2) controlPoint2:CGPointMake(3.8, 16)];
+            [p addLineToPoint:CGPointMake(13.2, 16)];
+            [p addCurveToPoint:CGPointMake(15, 14.2) controlPoint1:CGPointMake(14.2, 16) controlPoint2:CGPointMake(15, 15.2)];
+            [p addLineToPoint:CGPointMake(15, 12.4)];
+            [p stroke];
+        } else if ([kind isEqualToString:@"magnifier"]) {  // 搜索
+            [p appendPath:[UIBezierPath bezierPathWithArcCenter:CGPointMake(7.6, 7.6) radius:4.6 startAngle:0 endAngle:M_PI * 2 clockwise:YES]];
+            [p stroke];
+            [p removeAllPoints];
+            [p moveToPoint:CGPointMake(10.9, 10.9)];
+            [p addLineToPoint:CGPointMake(15.4, 15.4)];
+            [p stroke];
+        } else {
+            return;
+        }
+    }];
+    img = [img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    cache[kind] = img;
+    return img;
+}
+
 static UIView *QDBuildStatusCard(UIViewController *owner) {
     UIView *card = [[UIView alloc] init];
     card.translatesAutoresizingMaskIntoConstraints = NO;
@@ -370,7 +458,7 @@ static UIView *QDBuildStatusCard(UIViewController *owner) {
 
     UILabel *head = [[UILabel alloc] init];
     head.translatesAutoresizingMaskIntoConstraints = NO;
-    head.text = [DYYYSafetyGuard isSafeMode] ? @"⚠️ 安全模式运行中" : @"● 全部模块正常";
+    head.text = [DYYYSafetyGuard isSafeMode] ? @"安全模式运行中" : @"全部模块正常";
     head.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
     head.textColor = [DYYYSafetyGuard isSafeMode] ? [UIColor colorWithRed:1 green:0.76 blue:0.33 alpha:1]
                                                   : [UIColor colorWithRed:0.35 green:0.95 blue:0.6 alpha:1];
@@ -378,15 +466,15 @@ static UIView *QDBuildStatusCard(UIViewController *owner) {
     NSDictionary<NSString *, NSString *> *env = [DYYYCompatibility environmentInfo];
     NSString *hooks = [NSString stringWithFormat:@"%lu 项", (unsigned long)[DYYYHookManager allRecords].count];
     NSUInteger problem = [DYYYHookManager problemCount];
-    if (problem > 0) hooks = [NSString stringWithFormat:@"%@（⚠️ 异常 %lu）", hooks, (unsigned long)problem];
+    if (problem > 0) hooks = [NSString stringWithFormat:@"%@（异常 %lu）", hooks, (unsigned long)problem];
 
     NSArray<NSArray<NSString *> *> *rows = @[
-        @[ @"🛡️", @"Hook 状态", hooks ],
-        @[ @"🚀", @"已启用功能", [NSString stringWithFormat:@"%ld 项", (long)[DYYYDiagnostics enabledFeatureCount]] ],
-        @[ @"🧊", @"玻璃引擎", QDYTTGlassEngineName() ],
-        @[ @"📱", @"系统 / 抖音", [NSString stringWithFormat:@"iOS %@ · 抖音 %@",
+        @[ @"shield", @"Hook 状态", hooks ],
+        @[ @"bolt", @"已启用功能", [NSString stringWithFormat:@"%ld 项", (long)[DYYYDiagnostics enabledFeatureCount]] ],
+        @[ @"glass", @"玻璃引擎", QDYTTGlassEngineName() ],
+        @[ @"phone", @"系统 / 抖音", [NSString stringWithFormat:@"iOS %@ · 抖音 %@",
             env[@"iOS 版本"] ?: @"?", env[@"抖音版本"] ?: @"?"] ],
-        @[ @"📦", @"下载任务", [NSString stringWithFormat:@"今日完成 %lu · 运行中 %lu",
+        @[ @"box", @"下载任务", [NSString stringWithFormat:@"今日完成 %lu · 运行中 %lu",
             (unsigned long)[[DYYYTaskCenter shared] finishedCountToday],
             (unsigned long)[[DYYYTaskCenter shared] activeTasks].count] ],
     ];
@@ -403,10 +491,12 @@ static UIView *QDBuildStatusCard(UIViewController *owner) {
         line.alignment = UIStackViewAlignmentCenter;
         line.translatesAutoresizingMaskIntoConstraints = NO;
 
-        UILabel *icon = [[UILabel alloc] init];
-        icon.text = row[0];
-        icon.font = [UIFont systemFontOfSize:12.5];
-        [icon.widthAnchor constraintEqualToConstant:20].active = YES;
+        UIImageView *icon = [[UIImageView alloc] initWithImage:QDLineIconNamed(row[0])];
+        icon.tintColor = UIColor.labelColor;
+        icon.contentMode = UIViewContentModeScaleAspectFit;
+        icon.translatesAutoresizingMaskIntoConstraints = NO;
+        [icon.widthAnchor constraintEqualToConstant:16].active = YES;
+        [icon.heightAnchor constraintEqualToConstant:16].active = YES;
 
         UILabel *key = [[UILabel alloc] init];
         key.text = row[1];
@@ -524,12 +614,18 @@ static UIView *QDBuildHero(CGFloat width, UIViewController *owner, NSDictionary 
     search.font = [UIFont systemFontOfSize:14];
     search.textColor = UIColor.whiteColor;
     search.attributedPlaceholder = [[NSAttributedString alloc]
-        initWithString:@"🔍 搜索功能（下载 / 倍速 / 透明…）"
+        initWithString:@"搜索功能（下载 / 倍速 / 透明…）"
             attributes:@{ NSForegroundColorAttributeName : [UIColor colorWithWhite:1 alpha:0.55] }];
     search.backgroundColor = [UIColor colorWithWhite:1 alpha:0.16];
     search.layer.cornerRadius = 14;
     search.layer.masksToBounds = YES;
-    search.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 14, 1)];
+    UIView *lv = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 32, 18)];
+    UIImageView *mag = [[UIImageView alloc] initWithFrame:CGRectMake(9, 1, 16, 16)];
+    mag.image = QDLineIconNamed(@"magnifier");
+    mag.tintColor = [UIColor colorWithWhite:1 alpha:0.6];
+    mag.contentMode = UIViewContentModeScaleAspectFit;
+    [lv addSubview:mag];
+    search.leftView = lv;
     search.leftViewMode = UITextFieldViewModeAlways;
     search.clearButtonMode = UITextFieldViewModeWhileEditing;
     search.returnKeyType = UIReturnKeySearch;
@@ -697,11 +793,16 @@ static UIView *QDBuildHero(CGFloat width, UIViewController *owner, NSDictionary 
     [vstack addArrangedSubview:quick];
     [vstack addArrangedSubview:tip];
 
-    // 只钉 top / 左右，底边留给内容自然高度，避免与容器固定高度打架
+    // 钉 top / 左右，底部用低优先级等于：既不与固定高度打架，又能让
+    // systemLayoutSizeFitting 算出真实内容高度（tableHeaderView 必须给准确高度）
+    NSLayoutConstraint *bottomPin = [vstack.bottomAnchor constraintEqualToAnchor:root.bottomAnchor constant:-12];
+    bottomPin.priority = 250;
+    NSLayoutConstraint *topPin = [vstack.topAnchor constraintEqualToAnchor:root.topAnchor constant:14];
     [NSLayoutConstraint activateConstraints:@[
-        [vstack.topAnchor constraintEqualToAnchor:root.topAnchor constant:14],
+        topPin,
         [vstack.leadingAnchor constraintEqualToAnchor:root.leadingAnchor constant:16],
         [vstack.trailingAnchor constraintEqualToAnchor:root.trailingAnchor constant:-16],
+        bottomPin,
     ]];
 
     return root;
@@ -741,19 +842,24 @@ static UIView *QDBuildSubHeader(CGFloat width, NSString *title, NSString *subtit
 #pragma mark - Hook
 
 static void QDThemeInstall(UIViewController *self) {
-    if (objc_getAssociatedObject(self, "qd_theme_installed")) return;
-    objc_setAssociatedObject(self, "qd_theme_installed", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    // 玻璃底只装一次
+    if (!objc_getAssociatedObject(self, "qd_theme_installed")) {
+        objc_setAssociatedObject(self, "qd_theme_installed", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        UIVisualEffectView *glass = [[UIVisualEffectView alloc] initWithEffect:QDThemeGlassEffect()];
+        glass.frame = self.view.bounds;
+        glass.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        glass.userInteractionEnabled = NO;
+        glass.tag = QD_KEEP_GLASS_TAG;
+        [self.view insertSubview:glass atIndex:0];
+    }
 
-    // 整页玻璃底（打 tag，避免被「关闭毛玻璃」误伤）
-    UIVisualEffectView *glass = [[UIVisualEffectView alloc] initWithEffect:QDThemeGlassEffect()];
-    glass.frame = self.view.bounds;
-    glass.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    glass.userInteractionEnabled = NO;
-    glass.tag = QD_KEEP_GLASS_TAG;
-    [self.view insertSubview:glass atIndex:0];
-
+    // 关键：表格没挂上时直接返回、不打标记，让 viewDidAppear 的兜底再装一次。
+    // （旧实现先打标记再找表格，表格为 nil 时兜底被跳过 → header 永远装不上）
     UITableView *tv = QDFindTableView(self.view, 0);
     if (!tv) return;
+    if (objc_getAssociatedObject(self, "qd_theme_header")) return;
+    objc_setAssociatedObject(self, "qd_theme_header", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
     tv.backgroundColor = [UIColor clearColor];
     tv.backgroundView = nil;
     tv.separatorColor = [UIColor separatorColor];
@@ -766,7 +872,13 @@ static void QDThemeInstall(UIViewController *self) {
     if (pageTitle.length == 0) pageTitle = @"";
     if (isRoot) {
         NSDictionary *blocks = objc_getAssociatedObject(self, "qd_category_blocks");
-        tv.tableHeaderView = QDBuildHero(w, self, blocks);
+        UIView *hero = QDBuildHero(w, self, blocks);
+        CGFloat h = [hero systemLayoutSizeFittingSize:CGSizeMake(w, 0)
+                                  withHorizontalFittingPriority:UILayoutPriorityRequired
+                                        verticalFittingPriority:UILayoutPriorityFittingSizeLevel].height;
+        if (h < 120) h = 564;   // 兜底：约束异常时保底原高度
+        hero.frame = CGRectMake(0, 0, w, h + 6);
+        tv.tableHeaderView = hero;
     } else {
         tv.tableHeaderView = QDBuildSubHeader(w, pageTitle, @"元抖 · 抖音增强套件");
     }

@@ -46,6 +46,7 @@ static NSString *const kQDYTTKeyGradient  = @"YTT.gradient";
 static NSString *const kQDYTTKeyCapsule   = @"YTT.capsule";
 static NSString *const kQDYTTKeyExtend    = @"YTT.extend";
 static NSString *const kQDYTTKeyFloating  = @"YTT.floating";
+static NSString *const kQDYTTKeyAutoTint  = @"YTT.autotint";   // 首页视频全屏播放：底栏颜色自动跟随视频画面
 
 void QDYTTGlassRegisterDefaults(void) {
     static dispatch_once_t once;
@@ -57,6 +58,7 @@ void QDYTTGlassRegisterDefaults(void) {
             kQDYTTKeyCapsule  : @NO,    // 仅引擎 B 的装饰胶囊，默认关
             kQDYTTKeyExtend   : @YES,   // 视频透出底栏：底栏后面是画面而不是黑块（用户明确要的）
             kQDYTTKeyFloating : @YES,   // iOS 26+ 默认走悬浮胶囊引擎
+            kQDYTTKeyAutoTint : @YES,   // 首页视频全屏播放：底栏颜色自动跟随视频，不再一直黑
         }];
     });
 }
@@ -71,6 +73,7 @@ BOOL QDYTTGlassGradientEnabled(void) { return QDYTTBool(kQDYTTKeyGradient); }
 BOOL QDYTTGlassCapsuleEnabled(void)  { return QDYTTBool(kQDYTTKeyCapsule); }
 BOOL QDYTTGlassExtendEnabled(void)   { return QDYTTBool(kQDYTTKeyExtend); }
 BOOL QDYTTGlassFloatingEnabled(void) { return QDYTTBool(kQDYTTKeyFloating); }
+BOOL QDYTTAutoTintEnabled(void)      { return QDYTTBool(kQDYTTKeyAutoTint); }
 
 #pragma mark - 状态（给设置页读）
 
@@ -685,6 +688,117 @@ static void QDYTTExtendApply(void) {
     CGRect frame = best.frame;
     frame.size.height = bottom - CGRectGetMinY(frame);
     best.frame = frame;
+}
+
+#pragma mark - 首页视频全屏播放：底栏颜色自动跟随视频画面
+
+// 采样当前视频帧的平均色（缩到 10x10 求均值），垫一层同色洗色层在视频底部、
+// 悬浮玻璃后面——玻璃透出的就是视频的颜色，画面变了底栏颜色跟着变。
+static void QDYTTAutoTintApply(UIView *video) {
+    if (!video || !video.window) return;
+
+    UIView *wash = objc_getAssociatedObject(video, "qd_tint_wash");
+    if (!wash) {
+        wash = [[UIView alloc] init];
+        wash.userInteractionEnabled = NO;
+        wash.translatesAutoresizingMaskIntoConstraints = NO;
+        [video addSubview:wash];
+        [wash.leadingAnchor constraintEqualToAnchor:video.leadingAnchor].active = YES;
+        [wash.trailingAnchor constraintEqualToAnchor:video.trailingAnchor].active = YES;
+        [wash.bottomAnchor constraintEqualToAnchor:video.bottomAnchor].active = YES;
+        [wash.heightAnchor constraintEqualToConstant:140].active = YES;
+        objc_setAssociatedObject(video, "qd_tint_wash", wash, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+
+    // 采样时把洗色层暂时隐藏，避免「采样到自己的颜色」正反馈
+    wash.hidden = YES;
+    UIGraphicsImageRendererFormat *fmt = [[UIGraphicsImageRendererFormat alloc] init];
+    fmt.scale = 1.0;
+    fmt.opaque = YES;
+    UIGraphicsImageRenderer *r = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(10, 10) format:fmt];
+    UIImage *snap = [r imageWithActions:^(__unused UIGraphicsImageRendererContext *ctx) {
+        [video drawViewHierarchyInRect:video.bounds afterScreenUpdates:NO];
+    }];
+    wash.hidden = NO;
+    CGImageRef cg = snap.CGImage;
+    if (!cg) return;
+
+    unsigned char px[400];
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef bmp = CGBitmapContextCreate(px, 10, 10, 8, 40, cs,
+                                             kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
+    if (!bmp) { CGColorSpaceRelease(cs); return; }
+    CGContextDrawImage(bmp, CGRectMake(0, 0, 10, 10), cg);
+    CGContextRelease(bmp);
+    CGColorSpaceRelease(cs);
+
+    long rSum = 0, gSum = 0, bSum = 0;
+    for (int i = 0; i < 100; i++) {
+        rSum += px[i * 4];
+        gSum += px[i * 4 + 1];
+        bSum += px[i * 4 + 2];
+    }
+    CGFloat rr = rSum / 100.0 / 255.0, gg = gSum / 100.0 / 255.0, bb = bSum / 100.0 / 255.0;
+
+    // 与上次颜色几乎一样就跳过，避免反复动画
+    UIColor *prev = objc_getAssociatedObject(video, "qd_tint_color");
+    if (prev) {
+        CGFloat pr = 0, pg = 0, pb = 0, pa = 0;
+        [prev getRed:&pr green:&pg blue:&pb alpha:&pa];
+        if (fabs(pr - rr) < 0.04 && fabs(pg - gg) < 0.04 && fabs(pb - bb) < 0.04) return;
+    }
+    UIColor *next = [UIColor colorWithRed:rr green:gg blue:bb alpha:0.55];
+    objc_setAssociatedObject(video, "qd_tint_color", next, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [UIView transitionWithView:wash duration:0.6 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{
+        wash.backgroundColor = next;
+    } completion:nil];
+}
+
+static void QDYTTAutoTintSweep(void) {
+    // 关了开关：把还挂着的洗色层清掉
+    if (!QDYTTAutoTintEnabled() || !QDYTTGlassEnabled()) {
+        UIWindow *window = [DYYYUtils getActiveWindow];
+        if (window) {
+            NSMutableArray<UIView *> *q = [NSMutableArray arrayWithObject:window];
+            int budget = 3000;
+            while (q.count > 0 && budget-- > 0) {
+                UIView *n = q.firstObject;
+                [q removeObjectAtIndex:0];
+                UIView *wash = objc_getAssociatedObject(n, "qd_tint_wash");
+                if (wash) {
+                    [wash removeFromSuperview];
+                    objc_setAssociatedObject(n, "qd_tint_wash", nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                    objc_setAssociatedObject(n, "qd_tint_color", nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                }
+                if (n.subviews.count > 60) continue;
+                [q addObjectsFromArray:n.subviews];
+            }
+        }
+        return;
+    }
+
+    // 找当前视频画面（与背景延伸同一套打分逻辑）
+    UIWindow *window = [DYYYUtils getActiveWindow];
+    if (!window) return;
+    CGRect windowBounds = window.bounds;
+    if (windowBounds.size.width > windowBounds.size.height) return;   // 只处理竖屏
+
+    UIView *best = nil;
+    NSInteger bestScore = 80;
+    NSMutableArray<UIView *> *queue = [NSMutableArray arrayWithObject:window];
+    int budget = 4000;
+    while (queue.count > 0 && budget-- > 0) {
+        UIView *node = queue.firstObject;
+        [queue removeObjectAtIndex:0];
+        NSInteger score = QDYTTWorkScore(node, windowBounds);
+        if (score > bestScore) {
+            bestScore = score;
+            best = node;
+        }
+        if (node.subviews.count > 60) continue;
+        [queue addObjectsFromArray:node.subviews];
+    }
+    if (best) QDYTTAutoTintApply(best);
 }
 
 #pragma mark - 引擎 A：悬浮胶囊（iOS 26+）
@@ -1309,6 +1423,7 @@ static void QDYTTTick(UIView *hint) {
     static NSUInteger tick = 0;
     tick++;
     if (tick % 12 == 0) QDYTTExtendApply();   // 背景延伸较贵，降频
+    if (tick % 4 == 0) QDYTTAutoTintSweep();  // 首页视频全屏播放：底栏颜色跟随视频（1s 一次，成本极低）
 }
 
 void QDYTTGlassRefresh(void) {

@@ -3625,7 +3625,7 @@ speedSettingsItem.detail = trimmedText;
 
     AWESettingItemModel *logViewerItem = [[%c(AWESettingItemModel) alloc] init];
     logViewerItem.identifier = @"DYYYLogViewer";
-    logViewerItem.title = @"📜 运行日志";
+    logViewerItem.title = @"运行日志";
     logViewerItem.detail = @"";
     logViewerItem.type = 0;
     logViewerItem.svgIconImageName = @"ic_doc_outlined_20";
@@ -3636,11 +3636,10 @@ speedSettingsItem.detail = trimmedText;
       UIViewController *page = [[DYYYLogViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
       [settingsVC.navigationController pushViewController:page animated:YES];
     };
-    [mainItems addObject:logViewerItem];
 
     AWESettingItemModel *snapshotItem = [[%c(AWESettingItemModel) alloc] init];
     snapshotItem.identifier = @"DYYYSnapshots";
-    snapshotItem.title = @"💾 配置快照";
+    snapshotItem.title = @"配置快照";
     snapshotItem.detail = @"";
     snapshotItem.type = 0;
     snapshotItem.svgIconImageName = @"ic_memorycard_outlined_20";
@@ -3651,11 +3650,10 @@ speedSettingsItem.detail = trimmedText;
       UIViewController *page = [[DYYYSnapshotViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
       [settingsVC.navigationController pushViewController:page animated:YES];
     };
-    [mainItems addObject:snapshotItem];
 
     AWESettingItemModel *diagnosticsItem = [[%c(AWESettingItemModel) alloc] init];
     diagnosticsItem.identifier = @"DYYYDiagnostics";
-    diagnosticsItem.title = @"🩺 诊断报告";
+    diagnosticsItem.title = @"诊断报告";
     diagnosticsItem.detail = @"一键复制 / 分享";
     diagnosticsItem.type = 0;
     diagnosticsItem.svgIconImageName = @"ic_health_outlined_20";
@@ -3667,7 +3665,10 @@ speedSettingsItem.detail = trimmedText;
       [DYYYUtils showToast:@"诊断报告已复制，可通过分享面板发送"];
       [DYYYDiagnostics presentShareSheetForReport];
     };
-    [mainItems addObject:diagnosticsItem];
+    // 快照 / 日志 / 诊断：归到「关于」分区，排在「关于插件」下方
+    [aboutItems addObject:logViewerItem];
+    [aboutItems addObject:snapshotItem];
+    [aboutItems addObject:diagnosticsItem];
 
     mainSection.itemArray = mainItems;
     aboutSection.itemArray = aboutItems;
@@ -3678,7 +3679,7 @@ speedSettingsItem.detail = trimmedText;
     dashboardSection.sectionHeaderHeight = 40;
     dashboardSection.type = 0;
 
-    NSString *safeModeText = [DYYYSafetyGuard isSafeMode] ? @"⚠️ 安全模式" : @"● 正常运行";
+    NSString *safeModeText = [DYYYSafetyGuard isSafeMode] ? @"安全模式" : @"正常运行";
     AWESettingItemModel *dashboardHeaderItem = [[%c(AWESettingItemModel) alloc] init];
     dashboardHeaderItem.identifier = @"DYYYDashboardHeader";
     dashboardHeaderItem.title = [NSString stringWithFormat:@"%@ v%@", DYYY_NAME, DYYY_VERSION];
@@ -3695,7 +3696,7 @@ speedSettingsItem.detail = trimmedText;
 
     AWESettingItemModel *dashboardTasksItem = [[%c(AWESettingItemModel) alloc] init];
     dashboardTasksItem.identifier = @"DYYYDashboardTasks";
-    dashboardTasksItem.title = @"📥 下载任务";
+    dashboardTasksItem.title = @"下载任务";
     dashboardTasksItem.detail = [NSString stringWithFormat:@"今日完成 %lu 个", (unsigned long)[[DYYYTaskCenter shared] finishedCountToday]];
     dashboardTasksItem.type = 0;
     dashboardTasksItem.svgIconImageName = @"ic_download_outlined_20";

@@ -33,6 +33,7 @@ static NSArray<NSArray<NSString *> *> *QDYTTItems(void) {
             @[ @"摘掉压暗渐变", @"移除盖在玻璃上的黑色渐变，通透感更强", @"YTT.gradient" ],
             @[ @"清除底栏着色", @"Clear 档：进一步清掉底栏自身的着色层", @"YTT.clear" ],
             @[ @"玻璃胶囊跟随", @"切换 Tab 时玻璃胶囊跟随滑动（仅旧引擎）", @"YTT.capsule" ],
+            @[ @"首页视频全屏播放", @"底栏颜色自动跟随视频画面切换，不再一直是黑的", @"YTT.autotint" ],
         ];
     });
     return items;
