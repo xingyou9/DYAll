@@ -126,7 +126,7 @@
         NSString *statusText;
         switch (record.status) {
             case DYYYHookStatusSupported:   statusText = @"✓ 生效"; break;
-            case DYYYHookStatusUnsupported: statusText = @"⚠ 不兼容"; break;
+            case DYYYHookStatusUnsupported: statusText = @"! 不兼容"; break;
             case DYYYHookStatusDisabled:    statusText = @"- 已关闭"; break;
             case DYYYHookStatusFailed:      statusText = @"✗ 失败"; break;
         }

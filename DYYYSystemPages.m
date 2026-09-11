@@ -139,11 +139,11 @@ static void DYYYShareFiles(UIViewController *host, NSArray<NSURL *> *fileURLs, N
             NSPredicate *predicate = [NSPredicate predicateWithFormat:@"status == %d OR status == %d", (NSInteger)DYYYHookStatusUnsupported, (NSInteger)DYYYHookStatusFailed];
             NSArray<DYYYHookRecord *> *problems = [[DYYYHookManager allRecords] filteredArrayUsingPredicate:predicate];
             if (problems.count == 0) {
-                cell.textLabel.text = @"✅ 全部 Hook 正常";
+                cell.textLabel.text = @"全部 Hook 正常";
                 cell.detailTextLabel.text = @"";
             } else if (indexPath.row < (NSInteger)problems.count) {
                 DYYYHookRecord *record = problems[indexPath.row];
-                cell.textLabel.text = [NSString stringWithFormat:@"⚠️ %@", record.hookID];
+                cell.textLabel.text = record.hookID;
                 cell.detailTextLabel.text = record.detail ?: @"未知原因";
             } else {
                 cell.textLabel.text = @"";
@@ -387,10 +387,10 @@ static void DYYYShareFiles(UIViewController *host, NSArray<NSURL *> *fileURLs, N
     DYYYTaskRecord *record = history[indexPath.row];
     NSString *icon;
     switch (record.state) {
-        case DYYYTaskStateDone:      icon = @"✅"; break;
-        case DYYYTaskStateFailed:    icon = @"❌"; break;
+        case DYYYTaskStateDone:      icon = @"√"; break;
+        case DYYYTaskStateFailed:    icon = @"×"; break;
         case DYYYTaskStateCancelled: icon = @"🚫"; break;
-        default:                     icon = @"⏳"; break;
+        default:                     icon = @"…"; break;
     }
     cell.textLabel.text = [NSString stringWithFormat:@"%@ %@ [%@]", icon, record.title, record.type ?: @"任务"];
     cell.detailTextLabel.text = [NSString stringWithFormat:@"%@ · %@", DYYYTaskStateName(record.state), DYYYTimeString(record.finishedAt ?: record.createdAt)];
