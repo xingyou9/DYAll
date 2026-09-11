@@ -125,6 +125,12 @@
  */
 + (void)cancelAllDownloads;
 
+/**
+ * 从任务中心重新下载失败的下载（根据 URL 查找上次尝试的媒体类型与音频）
+ * @param url 失败任务的源 URL
+ */
++ (void)retryDownloadWithURL:(NSURL *)url;
+
 #pragma mark - 视频处理方法
 /**
  * 解析分享链接并下载视频

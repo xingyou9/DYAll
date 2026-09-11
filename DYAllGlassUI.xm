@@ -10,8 +10,13 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import "DYYYSettingViewController.h"
+#import "DYYYSafetyGuard.h"
 
 static BOOL DYAllGlassPrefEnabled(void) {
+    // 自动降级：安全模式下强制关闭液态玻璃，避免重 UI 效果拖垮已不稳定的进程
+    if ([DYYYSafetyGuard isSafeMode]) {
+        return NO;
+    }
     // 默认开启液态玻璃；写入 DYAllGlassUIDisabled = YES 可关闭
     return ![[NSUserDefaults standardUserDefaults] boolForKey:@"DYAllGlassUIDisabled"];
 }

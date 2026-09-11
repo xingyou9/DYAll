@@ -17,6 +17,15 @@
 #import "DYYYSettingsHelper.h"
 #import "DYYYUtils.h"
 
+#import "DYYYCompatibility.h"
+#import "DYYYDiagnostics.h"
+#import "DYYYHookManager.h"
+#import "DYYYLogger.h"
+#import "DYYYSafetyGuard.h"
+#import "DYYYSettingsIndex.h"
+#import "DYYYSystemPages.h"
+#import "DYYYTaskCenter.h"
+
 @class DYYYIconOptionsDialogView;
 static void showIconOptionsDialog(NSString *title, UIImage *previewImage, NSString *saveFilename, void (^onClear)(void), void (^onSelect)(void));
 
@@ -3603,10 +3612,177 @@ speedSettingsItem.detail = trimmedText;
     };
     [mainItems addObject:systemSettingItem];
 
+    // ===== 企业级功能中心入口（搜索 / 状态中心 / 任务中心 / 日志 / 快照 / 诊断）=====
+    NSMutableDictionary<NSString *, void (^)(void)> *categoryBlocks = [NSMutableDictionary dictionary];
+    categoryBlocks[@"基本设置"] = ^{ void (^jump)(void) = basicSettingItem.cellTappedBlock; if (jump) jump(); };
+    categoryBlocks[@"界面设置"] = ^{ void (^jump)(void) = uiSettingItem.cellTappedBlock; if (jump) jump(); };
+    categoryBlocks[@"隐藏设置"] = ^{ void (^jump)(void) = hideSettingItem.cellTappedBlock; if (jump) jump(); };
+    categoryBlocks[@"顶栏移除"] = ^{ void (^jump)(void) = removeSettingItem.cellTappedBlock; if (jump) jump(); };
+    categoryBlocks[@"增强设置"] = ^{ void (^jump)(void) = enhanceSettingItem.cellTappedBlock; if (jump) jump(); };
+    categoryBlocks[@"悬浮按钮"] = ^{ void (^jump)(void) = floatButtonSettingItem.cellTappedBlock; if (jump) jump(); };
+
+    AWESettingItemModel *searchSettingItem = [[%c(AWESettingItemModel) alloc] init];
+    searchSettingItem.identifier = @"DYYYSettingsSearch";
+    searchSettingItem.title = @"🔎 搜索设置";
+    searchSettingItem.detail = [NSString stringWithFormat:@"%lu 项功能", (unsigned long)DYYYSettingsSearchIndex().count];
+    searchSettingItem.type = 0;
+    searchSettingItem.svgIconImageName = @"ic_search_outlined_20";
+    searchSettingItem.cellType = 26;
+    searchSettingItem.colorStyle = 0;
+    searchSettingItem.isEnable = YES;
+    searchSettingItem.cellTappedBlock = ^{
+      DYYYSettingsSearchViewController *page = [[DYYYSettingsSearchViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      page.categoryBlocks = categoryBlocks;
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+    [mainItems addObject:searchSettingItem];
+
+    AWESettingItemModel *statusCenterItem = [[%c(AWESettingItemModel) alloc] init];
+    statusCenterItem.identifier = @"DYYYStatusCenter";
+    statusCenterItem.title = @"📊 状态中心";
+    statusCenterItem.detail = [DYYYHookManager problemCount] > 0 ? [NSString stringWithFormat:@"%lu 项异常", (unsigned long)[DYYYHookManager problemCount]] : @"全部正常";
+    statusCenterItem.type = 0;
+    statusCenterItem.svgIconImageName = @"ic_status_outlined_20";
+    statusCenterItem.cellType = 26;
+    statusCenterItem.colorStyle = 0;
+    statusCenterItem.isEnable = YES;
+    statusCenterItem.cellTappedBlock = ^{
+      UIViewController *page = [[DYYYStatusViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+    [mainItems addObject:statusCenterItem];
+
+    AWESettingItemModel *taskCenterItem = [[%c(AWESettingItemModel) alloc] init];
+    taskCenterItem.identifier = @"DYYYTaskCenterEntry";
+    taskCenterItem.title = @"📦 任务中心";
+    taskCenterItem.detail = [[DYYYTaskCenter shared] activeTasks].count > 0 ? [NSString stringWithFormat:@"%lu 个进行中", (unsigned long)[[DYYYTaskCenter shared] activeTasks].count] : @"下载 / 转换任务";
+    taskCenterItem.type = 0;
+    taskCenterItem.svgIconImageName = @"ic_download_outlined_20";
+    taskCenterItem.cellType = 26;
+    taskCenterItem.colorStyle = 0;
+    taskCenterItem.isEnable = YES;
+    taskCenterItem.cellTappedBlock = ^{
+      UIViewController *page = [[DYYYTaskCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+    [mainItems addObject:taskCenterItem];
+
+    AWESettingItemModel *logViewerItem = [[%c(AWESettingItemModel) alloc] init];
+    logViewerItem.identifier = @"DYYYLogViewer";
+    logViewerItem.title = @"📜 运行日志";
+    logViewerItem.detail = @"";
+    logViewerItem.type = 0;
+    logViewerItem.svgIconImageName = @"ic_doc_outlined_20";
+    logViewerItem.cellType = 26;
+    logViewerItem.colorStyle = 0;
+    logViewerItem.isEnable = YES;
+    logViewerItem.cellTappedBlock = ^{
+      UIViewController *page = [[DYYYLogViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+    [mainItems addObject:logViewerItem];
+
+    AWESettingItemModel *snapshotItem = [[%c(AWESettingItemModel) alloc] init];
+    snapshotItem.identifier = @"DYYYSnapshots";
+    snapshotItem.title = @"💾 配置快照";
+    snapshotItem.detail = @"";
+    snapshotItem.type = 0;
+    snapshotItem.svgIconImageName = @"ic_memorycard_outlined_20";
+    snapshotItem.cellType = 26;
+    snapshotItem.colorStyle = 0;
+    snapshotItem.isEnable = YES;
+    snapshotItem.cellTappedBlock = ^{
+      UIViewController *page = [[DYYYSnapshotViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+    [mainItems addObject:snapshotItem];
+
+    AWESettingItemModel *diagnosticsItem = [[%c(AWESettingItemModel) alloc] init];
+    diagnosticsItem.identifier = @"DYYYDiagnostics";
+    diagnosticsItem.title = @"🩺 诊断报告";
+    diagnosticsItem.detail = @"一键复制 / 分享";
+    diagnosticsItem.type = 0;
+    diagnosticsItem.svgIconImageName = @"ic_health_outlined_20";
+    diagnosticsItem.cellType = 26;
+    diagnosticsItem.colorStyle = 0;
+    diagnosticsItem.isEnable = YES;
+    diagnosticsItem.cellTappedBlock = ^{
+      [DYYYDiagnostics copyReportToPasteboard];
+      [DYYYUtils showToast:@"诊断报告已复制，可通过分享面板发送"];
+      [DYYYDiagnostics presentShareSheetForReport];
+    };
+    [mainItems addObject:diagnosticsItem];
+
     mainSection.itemArray = mainItems;
     aboutSection.itemArray = aboutItems;
 
-    viewModel.sectionDataArray = @[ yttSection, mainSection, cleanupSection, backupSection, aboutSection ];
+    // ===== 设置首页仪表盘 =====
+    AWESettingSectionModel *dashboardSection = [[%c(AWESettingSectionModel) alloc] init];
+    dashboardSection.sectionHeaderTitle = @"元抖状态";
+    dashboardSection.sectionHeaderHeight = 40;
+    dashboardSection.type = 0;
+
+    NSString *safeModeText = [DYYYSafetyGuard isSafeMode] ? @"⚠️ 安全模式" : @"● 正常运行";
+    AWESettingItemModel *dashboardHeaderItem = [[%c(AWESettingItemModel) alloc] init];
+    dashboardHeaderItem.identifier = @"DYYYDashboardHeader";
+    dashboardHeaderItem.title = [NSString stringWithFormat:@"%@ v%@", DYYY_NAME, DYYY_VERSION];
+    dashboardHeaderItem.detail = safeModeText;
+    dashboardHeaderItem.type = 0;
+    dashboardHeaderItem.svgIconImageName = @"ic_gearsimplify_outlined_20";
+    dashboardHeaderItem.cellType = 26;
+    dashboardHeaderItem.colorStyle = 0;
+    dashboardHeaderItem.isEnable = YES;
+    dashboardHeaderItem.cellTappedBlock = ^{
+      UIViewController *page = [[DYYYStatusViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+
+    AWESettingItemModel *dashboardFeaturesItem = [[%c(AWESettingItemModel) alloc] init];
+    dashboardFeaturesItem.identifier = @"DYYYDashboardFeatures";
+    dashboardFeaturesItem.title = @"🚀 已启用功能";
+    dashboardFeaturesItem.detail = [DYYYCompatibility dependencyCheckPassed] ? [NSString stringWithFormat:@"%lu 项", [DYYYDiagnostics enabledFeatureCount]] : [NSString stringWithFormat:@"%lu 项（依赖缺失）", [DYYYDiagnostics enabledFeatureCount]];
+    dashboardFeaturesItem.type = 0;
+    dashboardFeaturesItem.svgIconImageName = @"ic_magic_outlined_20";
+    dashboardFeaturesItem.cellType = 26;
+    dashboardFeaturesItem.colorStyle = 0;
+    dashboardFeaturesItem.isEnable = YES;
+    dashboardFeaturesItem.cellTappedBlock = ^{
+      DYYYSettingsSearchViewController *page = [[DYYYSettingsSearchViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      page.categoryBlocks = categoryBlocks;
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+
+    AWESettingItemModel *dashboardTasksItem = [[%c(AWESettingItemModel) alloc] init];
+    dashboardTasksItem.identifier = @"DYYYDashboardTasks";
+    dashboardTasksItem.title = @"📥 下载任务";
+    dashboardTasksItem.detail = [NSString stringWithFormat:@"今日完成 %lu 个", (unsigned long)[[DYYYTaskCenter shared] finishedCountToday]];
+    dashboardTasksItem.type = 0;
+    dashboardTasksItem.svgIconImageName = @"ic_download_outlined_20";
+    dashboardTasksItem.cellType = 26;
+    dashboardTasksItem.colorStyle = 0;
+    dashboardTasksItem.isEnable = YES;
+    dashboardTasksItem.cellTappedBlock = ^{
+      UIViewController *page = [[DYYYTaskCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+
+    AWESettingItemModel *dashboardHookItem = [[%c(AWESettingItemModel) alloc] init];
+    dashboardHookItem.identifier = @"DYYYDashboardHooks";
+    dashboardHookItem.title = @"🛡️ Hook 状态";
+    dashboardHookItem.detail = [DYYYHookManager summaryText];
+    dashboardHookItem.type = 0;
+    dashboardHookItem.svgIconImageName = @"ic_shield_outlined_20";
+    dashboardHookItem.cellType = 26;
+    dashboardHookItem.colorStyle = 0;
+    dashboardHookItem.isEnable = YES;
+    dashboardHookItem.cellTappedBlock = ^{
+      UIViewController *page = [[DYYYStatusViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+
+    dashboardSection.itemArray = @[ dashboardHeaderItem, dashboardFeaturesItem, dashboardTasksItem, dashboardHookItem ];
+
+    viewModel.sectionDataArray = @[ dashboardSection, yttSection, mainSection, cleanupSection, backupSection, aboutSection ];
     objc_setAssociatedObject(settingsVC, &kViewModelKey, viewModel, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     [rootVC.navigationController pushViewController:(UIViewController *)settingsVC animated:YES];
 }

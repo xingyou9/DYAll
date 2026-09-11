@@ -36,7 +36,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = DYAll
 
-DYAll_FILES = QDAssistant.xm QDYTTPage.xm QDSettingsTheme.xm QDGlassTabBar.xm QDExtra.xm DYAllGlassUI.xm DYYY.xm DYYYFloatClearButton.xm DYYYFloatSpeedButton.m DYYYSettings.xm DYYYABTestHook.xm DYYYLongPressPanel.xm DYYYSettingsHelper.m DYYYImagePickerDelegate.m DYYYBackupPickerDelegate.m DYYYSettingViewController.m DYYYBottomAlertView.m DYYYCustomInputView.m DYYYOptionsSelectionView.m DYYYIconOptionsDialogView.m DYYYAboutDialogView.m DYYYKeywordListView.m DYYYFilterSettingsView.m DYYYConfirmCloseView.m DYYYToast.m DYYYManager.m DYYYUtils.m CityManager.m AWMSafeDispatchTimer.m
+DYAll_FILES = QDAssistant.xm QDYTTPage.xm QDSettingsTheme.xm QDGlassTabBar.xm QDExtra.xm DYAllGlassUI.xm DYYY.xm DYYYFloatClearButton.xm DYYYFloatSpeedButton.m DYYYSettings.xm DYYYABTestHook.xm DYYYLongPressPanel.xm DYYYSettingsHelper.m DYYYImagePickerDelegate.m DYYYBackupPickerDelegate.m DYYYSettingViewController.m DYYYBottomAlertView.m DYYYCustomInputView.m DYYYOptionsSelectionView.m DYYYIconOptionsDialogView.m DYYYAboutDialogView.m DYYYKeywordListView.m DYYYFilterSettingsView.m DYYYConfirmCloseView.m DYYYToast.m DYYYManager.m DYYYUtils.m CityManager.m AWMSafeDispatchTimer.m DYYYLogger.m DYYYHookManager.m DYYYSafetyGuard.m DYYYCompatibility.m DYYYTaskCenter.m DYYYDiagnostics.m DYYYSystemPages.m DYYYSettingsIndex.m
 DYAll_CFLAGS = -fobjc-arc -w
 DYAll_LDFLAGS = -weak_framework AVFAudio
 DYAll_FRAMEWORKS = CoreAudio MediaPlayer StoreKit

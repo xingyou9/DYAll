@@ -8,6 +8,8 @@
 #import <objc/runtime.h>
 
 #import "DYYYToast.h"
+#import "DYYYTaskCenter.h"
+#import "DYYYLogger.h"
 #import "DYYYUtils.h"
 
 
@@ -29,6 +31,13 @@
 @property(nonatomic, strong) NSMutableDictionary<NSString *, void (^)(BOOL success, NSURL *fileURL)> *completionBlocks;
 @property(nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *mediaTypeMap;
 @property(nonatomic, strong) NSMutableDictionary<NSString *, NSString *> *filePathToDownloadID;
+
+// 任务中心联动：URL/音频/重试计数（仅主线程访问）
+@property(nonatomic, strong) NSMutableDictionary<NSString *, NSURL *> *taskURLs;
+@property(nonatomic, strong) NSMutableDictionary<NSString *, NSURL *> *taskAudioURLs;
+@property(nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *taskRetryCountByURL;
+@property(nonatomic, strong) NSMutableDictionary<NSString *, NSNumber *> *failedMediaTypeByURL;
+@property(nonatomic, strong) NSMutableDictionary<NSString *, NSURL *> *failedAudioURLByURL;
 
 // 批量下载相关属性
 @property(nonatomic, strong) NSMutableDictionary<NSString *, NSString *> *downloadToBatchMap;                                                 // 下载ID到批量ID的映射
@@ -62,6 +71,11 @@
         _completionBlocks = [NSMutableDictionary dictionary];
         _mediaTypeMap = [NSMutableDictionary dictionary];
         _filePathToDownloadID = [NSMutableDictionary dictionary];
+        _taskURLs = [NSMutableDictionary dictionary];
+        _taskAudioURLs = [NSMutableDictionary dictionary];
+        _taskRetryCountByURL = [NSMutableDictionary dictionary];
+        _failedMediaTypeByURL = [NSMutableDictionary dictionary];
+        _failedAudioURLByURL = [NSMutableDictionary dictionary];
 
         // 初始化批量下载相关字典
         _downloadToBatchMap = [NSMutableDictionary dictionary];
@@ -519,6 +533,13 @@
       [[DYYYManager shared] setCompletionBlock:completion forDownloadID:downloadID];
       [[DYYYManager shared] setMediaType:mediaType forDownloadID:downloadID];
 
+      // 任务中心联动：记录源 URL / 音频 URL 并登记任务
+      [[DYYYManager shared].taskURLs setObject:url forKey:downloadID];
+      if (audioURL) {
+          [[DYYYManager shared].taskAudioURLs setObject:audioURL forKey:downloadID];
+      }
+      [[DYYYTaskCenter shared] beginTaskWithID:downloadID title:[url lastPathComponent] ?: @"媒体文件" type:@"下载"];
+
       // 配置下载会话 - 使用带委托的会话以获取进度更新
       NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration defaultSessionConfiguration];
       NSURLSession *session = [NSURLSession sessionWithConfiguration:configuration delegate:[DYYYManager shared] delegateQueue:[NSOperationQueue mainQueue]];
@@ -813,6 +834,14 @@
 
     [self removeMappingsForDownloadID:downloadID];
 
+    // 在清理前捕获重试所需信息（回调链在主线程，这里无竞争）
+    NSURL *taskURL = self.taskURLs[downloadID];
+    NSURL *taskAudioURL = self.taskAudioURLs[downloadID];
+    NSNumber *mediaTypeNumber = self.mediaTypeMap[downloadID];
+    void (^completionBlock)(BOOL success, NSURL *fileURL) = self.completionBlocks[downloadID];
+    NSURLSessionDownloadTask *task = self.downloadTasks[downloadID];
+    BOOL cancelled = task && task.error && task.error.code == NSURLErrorCancelled;
+
     dispatch_async(dispatch_get_main_queue(), ^{
       DYYYToast *progressView = self.progressViews[downloadID];
       if (progressView) {
@@ -829,6 +858,8 @@
       [self.mediaTypeMap removeObjectForKey:downloadID];
       [self.downloadTasks removeObjectForKey:downloadID];
       [self.downloadToBatchMap removeObjectForKey:downloadID];
+      [self.taskURLs removeObjectForKey:downloadID];
+      [self.taskAudioURLs removeObjectForKey:downloadID];
     });
 
     if (fileURL) {
@@ -839,6 +870,69 @@
             }
         }
     }
+
+    // 任务中心登记收尾（失败时把源 URL 带上，供任务中心手动重试）
+    [[DYYYTaskCenter shared] finishTaskWithID:downloadID success:success cancelled:cancelled fileURL:(success ? fileURL : taskURL)];
+
+    if (success) {
+        if (taskURL) {
+            [self.taskRetryCountByURL removeObjectForKey:taskURL.absoluteString];
+            [self.failedMediaTypeByURL removeObjectForKey:taskURL.absoluteString];
+            [self.failedAudioURLByURL removeObjectForKey:taskURL.absoluteString];
+        }
+        return;
+    }
+
+    if (cancelled || !taskURL) {
+        return;
+    }
+
+    // 失败自动重试：每个 URL 最多自动重试 1 次（用户取消不重试）
+    NSUInteger retryCount = [self.taskRetryCountByURL[taskURL.absoluteString] integerValue];
+    [self.taskRetryCountByURL setObject:@(retryCount + 1) forKey:taskURL.absoluteString];
+    [self.failedMediaTypeByURL setObject:(mediaTypeNumber ?: @(MediaTypeVideo)) forKey:taskURL.absoluteString];
+    if (taskAudioURL) {
+        [self.failedAudioURLByURL setObject:taskAudioURL forKey:taskURL.absoluteString];
+    }
+
+    if (retryCount >= 1) {
+        [DYYYLogger warning:@"Download" message:[NSString stringWithFormat:@"下载失败且已重试过：%@（可到任务中心手动重试）", taskURL]];
+        return;
+    }
+
+    MediaType retryType = mediaTypeNumber ? (MediaType)[mediaTypeNumber integerValue] : MediaTypeVideo;
+    [DYYYLogger warning:@"Download" message:[NSString stringWithFormat:@"下载失败，0.5s 后自动重试（第 1 次）：%@", taskURL]];
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      [[DYYYManager shared] downloadMediaWithProgress:taskURL
+                                            mediaType:retryType
+                                                audio:taskAudioURL
+                                             progress:nil
+                                           completion:completionBlock];
+    });
+}
+
++ (void)retryDownloadWithURL:(NSURL *)url {
+    if (!url) {
+        return;
+    }
+    NSString *key = url.absoluteString;
+    MediaType mediaType = MediaTypeVideo;
+    NSNumber *storedType = [[DYYYManager shared].failedMediaTypeByURL objectForKey:key];
+    if (storedType) {
+        mediaType = (MediaType)[storedType integerValue];
+    }
+    NSURL *audioURL = [[DYYYManager shared].failedAudioURLByURL objectForKey:key];
+    [[DYYYManager shared].taskRetryCountByURL removeObjectForKey:key];
+    [self downloadMediaWithProgress:url
+                          mediaType:mediaType
+                              audio:audioURL
+                           progress:nil
+                         completion:^(BOOL success, NSURL *fileURL) {
+                           dispatch_async(dispatch_get_main_queue(), ^{
+                             [DYYYUtils showToast:success ? @"重新下载成功" : @"重新下载失败"];
+                           });
+                         }];
 }
 
 #pragma mark - NSURLSessionDownloadDelegate
@@ -870,6 +964,7 @@
       // 如果找到对应的进度视图，更新进度
       if (downloadIDForTask) {
           [self.taskProgressMap setObject:@(progress) forKey:downloadIDForTask];
+          [[DYYYTaskCenter shared] updateProgress:progress forTaskID:downloadIDForTask];
 
           DYYYToast *progressView = self.progressViews[downloadIDForTask];
           if (progressView) {

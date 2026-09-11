@@ -26,6 +26,11 @@
 #import "DYYYToast.h"
 #import "DYYYUtils.h"
 
+#import "DYYYCompatibility.h"
+#import "DYYYHookManager.h"
+#import "DYYYLogger.h"
+#import "DYYYSafetyGuard.h"
+
 static CGFloat gStartY = 0.0;
 static CGFloat gStartVal = 0.0;
 static DYEdgeMode gMode = DYEdgeModeNone;
@@ -8939,84 +8944,114 @@ static void findTargetViewInView(UIView *view) {
 }
 
 %ctor {
-    // 自动完成用户协议（不再弹出确认窗口）
-    [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYUserAgreementAccepted"];
-
-    Class interactionBaseLabelClass = objc_getClass("AWECommentSwiftBizUI.CommentInteractionBaseLabel");
-    if (interactionBaseLabelClass) {
-        %init(DYYYCommentExactTimeGroup, AWECommentSwiftBizUI_CommentInteractionBaseLabel = interactionBaseLabelClass);
-    }
-    
-    Class imMenuComponentClass = objc_getClass("AWEIMCustomMenuComponent");
-    if (imMenuComponentClass) {
-        SEL legacySelector = NSSelectorFromString(@"msg_showMenuForBubbleFrameInScreen:tapLocationInScreen:menuItemList:moreEmoticon:onCell:extra:");
-        SEL tapLocationSelector = NSSelectorFromString(@"msg_showMenuForBubbleFrameInScreen:tapLocationInScreen:menuItemList:menuPanelOptions:moreEmoticon:onCell:extra:");
-        SEL highLowSelector = NSSelectorFromString(@"msg_showMenuForBubbleFrameInScreen:highLocationInScreen:lowLocationInScreen:tryHighLocationFirst:menuItemList:menuPanelOptions:onCell:extra:");
-        if (legacySelector && class_getInstanceMethod(imMenuComponentClass, legacySelector)) {
-            %init(DYYYIMMenuLegacyGroup);
-        }
-        if (tapLocationSelector && class_getInstanceMethod(imMenuComponentClass, tapLocationSelector)) {
-            %init(DYYYIMMenuTapLocationGroup);
-        }
-        if (highLowSelector && class_getInstanceMethod(imMenuComponentClass, highLowSelector)) {
-            %init(DYYYIMMenuHighLowGroup);
-        }
+    // ===== 企业级启动序列：崩溃防护 → 日志 → 兼容性检查（任何一步失败都不能带崩抖音）=====
+    @try {
+        [DYYYSafetyGuard install];
+        [DYYYLogger startup];
+        [DYYYCompatibility performStartupChecks];
+    } @catch (NSException *startupException) {
+        NSLog(@"[DYYY] 启动初始化异常（已忽略继续）: %@", startupException);
     }
 
-    if (!DYYYGetBool(@"DYYYDisableSettingsGesture")) {
-        %init(DYYYSettingsGesture);
+    BOOL safeMode = [DYYYSafetyGuard isSafeMode];
+    if (safeMode) {
+        [DYYYLogger warning:@"Core" message:@"安全模式生效：仅加载核心功能，实验性 Hook 已跳过"];
     }
-    if (DYYYGetBool(@"DYYYUserAgreementAccepted")) {
-        static dispatch_once_t onceToken;
-        dispatch_once(&onceToken, ^{
-          Class wSwiftImpl = objc_getClass("AWECommentInputViewSwiftImpl.CommentInputContainerView");
-          %init(CommentInputContainerView = wSwiftImpl);
-        });
-        BOOL isAutoPlayEnabled = DYYYGetBool(@"DYYYEnableAutoPlay");
-        if (isAutoPlayEnabled) {
-            %init(AutoPlay);
-        }
-        if (DYYYGetBool(@"DYYYForceDownloadEmotion") ||
-            DYYYGetBool(@"DYYYForceDownloadCommentAudio") ||
-            DYYYGetBool(@"DYYYForceDownloadCommentImage")) {
-            %init(EnableStickerSaveMenu);
-        }
-        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-        isFloatSpeedButtonEnabled = [defaults boolForKey:@"DYYYEnableFloatSpeedButton"];
 
-        // 初始化红包激励挂件容器视图类组
-        Class incentivePendantClass = objc_getClass("AWEIncentiveSwiftImplDOUYINLite.IncentivePendantContainerView");
-        if (incentivePendantClass) {
-            %init(IncentivePendantGroup, AWEIncentiveSwiftImplDOUYINLite_IncentivePendantContainerView = incentivePendantClass);
-        }
-        Class imageContentClass = objc_getClass("BDMultiContentContainer.ImageContentView");
-        if (imageContentClass) {
-            %init(BDMultiContentImageViewGroup, BDMultiContentContainer_ImageContentView = imageContentClass);
+    @try {
+        // 自动完成用户协议（不再弹出确认窗口）
+        [[NSUserDefaults standardUserDefaults] setBool:YES forKey:@"DYYYUserAgreementAccepted"];
+
+        Class interactionBaseLabelClass = objc_getClass("AWECommentSwiftBizUI.CommentInteractionBaseLabel");
+        [DYYYHookManager checkClass:@"AWECommentSwiftBizUI.CommentInteractionBaseLabel" hookID:@"评论.精确时间"];
+        if (interactionBaseLabelClass && !safeMode) {
+            %init(DYYYCommentExactTimeGroup, AWECommentSwiftBizUI_CommentInteractionBaseLabel = interactionBaseLabelClass);
         }
 
-        // 动态获取 Swift 类并初始化对应的组
-        Class commentHeaderGeneralClass = objc_getClass("AWECommentPanelHeaderSwiftImpl.CommentHeaderGeneralView");
-        if (commentHeaderGeneralClass) {
-            %init(CommentHeaderGeneralGroup, AWECommentPanelHeaderSwiftImpl_CommentHeaderGeneralView = commentHeaderGeneralClass);
+        Class imMenuComponentClass = objc_getClass("AWEIMCustomMenuComponent");
+        [DYYYHookManager checkClass:@"AWEIMCustomMenuComponent" hookID:@"IM.长按菜单"];
+        if (imMenuComponentClass) {
+            SEL legacySelector = NSSelectorFromString(@"msg_showMenuForBubbleFrameInScreen:tapLocationInScreen:menuItemList:moreEmoticon:onCell:extra:");
+            SEL tapLocationSelector = NSSelectorFromString(@"msg_showMenuForBubbleFrameInScreen:tapLocationInScreen:menuItemList:menuPanelOptions:moreEmoticon:onCell:extra:");
+            SEL highLowSelector = NSSelectorFromString(@"msg_showMenuForBubbleFrameInScreen:highLocationInScreen:lowLocationInScreen:tryHighLocationFirst:menuItemList:menuPanelOptions:onCell:extra:");
+            if (legacySelector && class_getInstanceMethod(imMenuComponentClass, legacySelector)) {
+                %init(DYYYIMMenuLegacyGroup);
+            }
+            if (tapLocationSelector && class_getInstanceMethod(imMenuComponentClass, tapLocationSelector)) {
+                %init(DYYYIMMenuTapLocationGroup);
+            }
+            if (highLowSelector && class_getInstanceMethod(imMenuComponentClass, highLowSelector)) {
+                %init(DYYYIMMenuHighLowGroup);
+            }
         }
 
-        Class commentHeaderGoodsClass = objc_getClass("AWECommentPanelHeaderSwiftImpl.CommentHeaderGoodsView");
-        if (commentHeaderGoodsClass) {
-            %init(CommentHeaderGoodsGroup, AWECommentPanelHeaderSwiftImpl_CommentHeaderGoodsView = commentHeaderGoodsClass);
+        if (!DYYYGetBool(@"DYYYDisableSettingsGesture")) {
+            %init(DYYYSettingsGesture);
         }
-        Class commentHeaderTemplateClass = objc_getClass("AWECommentPanelHeaderSwiftImpl.CommentHeaderTemplateAnchorView");
-        if (commentHeaderTemplateClass) {
-            %init(CommentHeaderTemplateGroup, AWECommentPanelHeaderSwiftImpl_CommentHeaderTemplateAnchorView = commentHeaderTemplateClass);
-        }
+        if (DYYYGetBool(@"DYYYUserAgreementAccepted")) {
+            static dispatch_once_t onceToken;
+            dispatch_once(&onceToken, ^{
+              Class wSwiftImpl = objc_getClass("AWECommentInputViewSwiftImpl.CommentInputContainerView");
+              [DYYYHookManager checkClass:@"AWECommentInputViewSwiftImpl.CommentInputContainerView" hookID:@"评论.输入容器"];
+              if (!wSwiftImpl || !safeMode) return;
+              %init(CommentInputContainerView = wSwiftImpl);
+            });
+            BOOL isAutoPlayEnabled = DYYYGetBool(@"DYYYEnableAutoPlay");
+            // 安全模式下跳过实验性 Hook
+            if (isAutoPlayEnabled && !safeMode) {
+                [DYYYHookManager recordHookWithID:@"播放.自动连播" className:@"AutoPlay" selectorName:nil status:DYYYHookStatusSupported detail:nil];
+                %init(AutoPlay);
+            } else if (isAutoPlayEnabled && safeMode) {
+                [DYYYHookManager recordHookWithID:@"播放.自动连播" className:@"AutoPlay" selectorName:nil status:DYYYHookStatusDisabled detail:@"安全模式"];
+            }
+            if ((DYYYGetBool(@"DYYYForceDownloadEmotion") ||
+                DYYYGetBool(@"DYYYForceDownloadCommentAudio") ||
+                DYYYGetBool(@"DYYYForceDownloadCommentImage")) && !safeMode) {
+                [DYYYHookManager recordHookWithID:@"评论.强制保存菜单" className:@"EnableStickerSaveMenu" selectorName:nil status:DYYYHookStatusSupported detail:nil];
+                %init(EnableStickerSaveMenu);
+            }
+            NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+            isFloatSpeedButtonEnabled = [defaults boolForKey:@"DYYYEnableFloatSpeedButton"];
 
-        Class tipsVCClass = objc_getClass("AWECommentPanelListSwiftImpl.CommentBottomTipsContainerViewController");
-        if (tipsVCClass) {
-            %init(CommentBottomTipsVCGroup, AWECommentPanelListSwiftImpl_CommentBottomTipsContainerViewController = tipsVCClass);
-        }
+            // 初始化红包激励挂件容器视图类组（实验性：安全模式跳过）
+            Class incentivePendantClass = objc_getClass("AWEIncentiveSwiftImplDOUYINLite.IncentivePendantContainerView");
+            [DYYYHookManager checkClass:@"AWEIncentiveSwiftImplDOUYINLite.IncentivePendantContainerView" hookID:@"净化.红包激励挂件"];
+            if (incentivePendantClass && !safeMode) {
+                %init(IncentivePendantGroup, AWEIncentiveSwiftImplDOUYINLite_IncentivePendantContainerView = incentivePendantClass);
+            }
+            Class imageContentClass = objc_getClass("BDMultiContentContainer.ImageContentView");
+            [DYYYHookManager checkClass:@"BDMultiContentContainer.ImageContentView" hookID:@"评论.图片内容视图"];
+            if (imageContentClass && !safeMode) {
+                %init(BDMultiContentImageViewGroup, BDMultiContentContainer_ImageContentView = imageContentClass);
+            }
 
-        NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
-        DYYYRemoveKeyboardObserver();
-        dyyyKeyboardWillShowToken = [center addObserverForName:UIKeyboardWillShowNotification
+            // 动态获取 Swift 类并初始化对应的组
+            Class commentHeaderGeneralClass = objc_getClass("AWECommentPanelHeaderSwiftImpl.CommentHeaderGeneralView");
+            [DYYYHookManager checkClass:@"AWECommentPanelHeaderSwiftImpl.CommentHeaderGeneralView" hookID:@"评论.头部通用视图"];
+            if (commentHeaderGeneralClass) {
+                %init(CommentHeaderGeneralGroup, AWECommentPanelHeaderSwiftImpl_CommentHeaderGeneralView = commentHeaderGeneralClass);
+            }
+
+            Class commentHeaderGoodsClass = objc_getClass("AWECommentPanelHeaderSwiftImpl.CommentHeaderGoodsView");
+            [DYYYHookManager checkClass:@"AWECommentPanelHeaderSwiftImpl.CommentHeaderGoodsView" hookID:@"评论.头部商品视图"];
+            if (commentHeaderGoodsClass) {
+                %init(CommentHeaderGoodsGroup, AWECommentPanelHeaderSwiftImpl_CommentHeaderGoodsView = commentHeaderGoodsClass);
+            }
+            Class commentHeaderTemplateClass = objc_getClass("AWECommentPanelHeaderSwiftImpl.CommentHeaderTemplateAnchorView");
+            [DYYYHookManager checkClass:@"AWECommentPanelHeaderSwiftImpl.CommentHeaderTemplateAnchorView" hookID:@"评论.头部模板锚点"];
+            if (commentHeaderTemplateClass) {
+                %init(CommentHeaderTemplateGroup, AWECommentPanelHeaderSwiftImpl_CommentHeaderTemplateAnchorView = commentHeaderTemplateClass);
+            }
+
+            Class tipsVCClass = objc_getClass("AWECommentPanelListSwiftImpl.CommentBottomTipsContainerViewController");
+            [DYYYHookManager checkClass:@"AWECommentPanelListSwiftImpl.CommentBottomTipsContainerViewController" hookID:@"评论.底部提示容器"];
+            if (tipsVCClass) {
+                %init(CommentBottomTipsVCGroup, AWECommentPanelListSwiftImpl_CommentBottomTipsContainerViewController = tipsVCClass);
+            }
+
+            NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+            DYYYRemoveKeyboardObserver();
+            dyyyKeyboardWillShowToken = [center addObserverForName:UIKeyboardWillShowNotification
                                                         object:nil
                                                          queue:[NSOperationQueue mainQueue]
                                                     usingBlock:^(NSNotification *notification) {
@@ -9034,5 +9069,11 @@ static void findTargetViewInView(UIView *view) {
                                                           }
                                                       }
                                                     }];
+        }
+
+        [DYYYLogger info:@"Core" message:[NSString stringWithFormat:@"Hook 初始化完成：%@", [DYYYHookManager summaryText]]];
+    } @catch (NSException *hookException) {
+        [DYYYLogger logException:hookException module:@"Core"];
+        NSLog(@"[DYYY] Hook 初始化异常（已捕获，避免带崩宿主）: %@", hookException);
     }
 }

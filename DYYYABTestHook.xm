@@ -1,5 +1,7 @@
 #import "DYYYABTestHook.h"
 #import "DYYYConstants.h"
+#import "DYYYHookManager.h"
+#import "DYYYLogger.h"
 #import "DYYYUtils.h"
 #import <objc/runtime.h>
 
@@ -552,6 +554,9 @@ static void DYYYApplyTabBarHeightToCurrentABTestDataIfNeeded(void) {
       }
 
       NSLog(@"[DYYY] ABTest Hook已启动: 禁止下发=%@, 当前模式=%@", s_abTestBlockEnabled ? @"开启" : @"关闭", currentMode);
+
+      [DYYYHookManager checkClass:@"AWEABTestManager" hookID:@"远程配置.ABTest管理器"];
+      [DYYYLogger info:@"ABTest" message:[NSString stringWithFormat:@"ABTest Hook 已启动，当前模式=%@", currentMode]];
 
       [DYYYABTestHook loadLocalABTestConfig];
       [DYYYABTestHook applyFixedABTestData];
