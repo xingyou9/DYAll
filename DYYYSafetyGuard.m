@@ -102,7 +102,7 @@ static void DYYYUncaughtExceptionHandler(NSException *exception) {
 
     // 4. 稳定运行后清零计数
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kDYYYStableResetSeconds * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      if ([NSUserDefaults standardUserDefaults].integerForKey(kDYYYCrashCountKey) != 0) {
+      if ([[NSUserDefaults standardUserDefaults] integerForKey:kDYYYCrashCountKey] != 0) {
           [[NSUserDefaults standardUserDefaults] setInteger:0 forKey:kDYYYCrashCountKey];
           [[NSUserDefaults standardUserDefaults] synchronize];
           [DYYYLogger info:@"SafetyGuard" message:@"运行稳定，连续崩溃计数已清零"];

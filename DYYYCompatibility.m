@@ -129,7 +129,7 @@
                                  status:[self glassEffectSupported] ? DYYYHookStatusSupported : DYYYHookStatusUnsupported
                                  detail:[self glassEffectSupported] ? nil : @"需要 iOS 26+，已自动回退毛玻璃"];
 
-        if (![self douyinCompatibilityStatus isEqualToString:@"已验证"]) {
+        if (![[self douyinCompatibilityStatus] isEqualToString:@"已验证"]) {
             [DYYYLogger warning:@"Compat" message:[NSString stringWithFormat:@"当前抖音 %@ 超出已验证版本 %@，部分 Hook 可能失效；失效项将在状态中心列出", [self douyinVersion], [self testedDouyinVersion]]];
         }
     } @catch (NSException *exception) {
