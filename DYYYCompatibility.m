@@ -26,9 +26,36 @@
         return @"未知";
     }
     sysctlbyname("hw.machine", machine, &size, NULL, 0);
-    NSString *result = [NSString stringWithUTF8String:machine] ?: @"未知";
+    NSString *identifier = [NSString stringWithUTF8String:machine] ?: @"";
     free(machine);
-    return result;
+    if (identifier.length == 0) return @"未知";
+
+    // 机器标识 → 市场名称（覆盖 iPhone 11 ~ 17 / SE / iPad / iPod）
+    static NSDictionary<NSString *, NSString *> *map;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        map = @{
+            @"iPhone12,1" : @"iPhone 11",       @"iPhone12,3" : @"iPhone 11 Pro",
+            @"iPhone12,5" : @"iPhone 11 Pro Max", @"iPhone12,8" : @"iPhone SE 2",
+            @"iPhone13,1" : @"iPhone 12 mini",  @"iPhone13,2" : @"iPhone 12",
+            @"iPhone13,3" : @"iPhone 12 Pro",   @"iPhone13,4" : @"iPhone 12 Pro Max",
+            @"iPhone14,4" : @"iPhone 13 mini",  @"iPhone14,5" : @"iPhone 13",
+            @"iPhone14,2" : @"iPhone 13 Pro",   @"iPhone14,3" : @"iPhone 13 Pro Max",
+            @"iPhone14,6" : @"iPhone SE 3",
+            @"iPhone14,7" : @"iPhone 14",       @"iPhone14,8" : @"iPhone 14 Plus",
+            @"iPhone15,2" : @"iPhone 14 Pro",   @"iPhone15,3" : @"iPhone 14 Pro Max",
+            @"iPhone15,4" : @"iPhone 15",       @"iPhone15,5" : @"iPhone 15 Plus",
+            @"iPhone16,1" : @"iPhone 15 Pro",   @"iPhone16,2" : @"iPhone 15 Pro Max",
+            @"iPhone17,3" : @"iPhone 16",       @"iPhone17,4" : @"iPhone 16 Plus",
+            @"iPhone17,1" : @"iPhone 16 Pro",   @"iPhone17,2" : @"iPhone 16 Pro Max",
+            @"iPhone17,5" : @"iPhone 16e",
+            @"iPhone18,1" : @"iPhone 17 Pro",   @"iPhone18,2" : @"iPhone 17 Pro Max",
+            @"iPhone18,3" : @"iPhone 17",       @"iPhone18,4" : @"iPhone 17 Air",
+        };
+    });
+    NSString *name = map[identifier];
+    // 识别不了的新机型：保留原始标识，至少不显示错
+    return name ?: ([identifier hasPrefix:@"iPhone"] || [identifier hasPrefix:@"iPad"] ? identifier : @"未知");
 }
 
 + (NSString *)architectureName {
@@ -51,20 +78,30 @@
 
 + (NSString *)jailbreakScheme {
     NSFileManager *fm = [NSFileManager defaultManager];
-    if ([fm fileExistsAtPath:@"/var/jb/var/jb"]) {
-        return @"RootHide";
+    // Rootless（Dopamine / palera1n / Bootstrap，常见 /var/jb 前缀）
+    if ([fm fileExistsAtPath:@"/var/jb/usr/lib/TweakInject"] || [fm fileExistsAtPath:@"/var/jb/usr/lib/ellekit"]) {
+        return @"Rootless（/var/jb 引导）";
     }
     if ([fm fileExistsAtPath:@"/var/jb"]) {
-        return @"Rootless (Dopamine/palera1n)";
+        return @"Rootless（/var/jb 引导）";
     }
+    // Rootful（Substrate / ElleKit / TweakInject 直装）
     if ([fm fileExistsAtPath:@"/Library/MobileSubstrate/MobileSubstrate.dylib"]) {
-        return @"Rootful";
+        return @"Rootful（Substrate）";
     }
-    return @"未知";
+    if ([fm fileExistsAtPath:@"/usr/lib/ellekit"] || [fm fileExistsAtPath:@"/usr/lib/TweakInject"]) {
+        return @"Rootful（ElleKit / TweakInject）";
+    }
+    // TrollStore 常驻目录
+    if ([fm fileExistsAtPath:@"/Applications/TrollStore.app"] || [fm fileExistsAtPath:@"/usr/bin/trollstorehelper"]) {
+        return @"TrollStore";
+    }
+    // 都没命中但插件确实加载了：报已注入而不是未知
+    return @"已注入（未识别引导）";
 }
 
 + (NSString *)testedDouyinVersion {
-    return @"36.5.0";
+    return @"40.1.0";
 }
 
 + (NSString *)douyinCompatibilityStatus {

@@ -866,7 +866,10 @@ static void QDThemeInstall(UIViewController *self) {
 
     CGFloat w = tv.bounds.size.width > 10 ? tv.bounds.size.width : self.view.bounds.size.width;
     if (w < 10) w = [UIScreen mainScreen].bounds.size.width;
-    BOOL isRoot = (self.navigationController.viewControllers.firstObject == self);
+    // 元抖主页是 push 到抖音导航栈的，firstObject 永远不是自己；
+    // 必须用显式主页面标记判断，否则搜索框和状态大框永远不构建。
+    BOOL isRoot = [objc_getAssociatedObject(self, "qd_is_main_page") boolValue]
+                  || (self.navigationController.viewControllers.firstObject == self);
     NSString *pageTitle = objc_getAssociatedObject(self, "qd_page_title");
     if (pageTitle.length == 0) pageTitle = self.title;
     if (pageTitle.length == 0) pageTitle = @"";

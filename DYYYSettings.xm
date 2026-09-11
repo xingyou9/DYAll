@@ -230,6 +230,8 @@ extern "C"
 void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
     AWESettingBaseViewController *settingsVC = [[%c(AWESettingBaseViewController) alloc] init];
     objc_setAssociatedObject(settingsVC, "qd_is_qingdou_page", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    // 主页标记：本页是 push 到抖音导航栈的，不能靠 firstObject 判断是不是主页
+    objc_setAssociatedObject(settingsVC, "qd_is_main_page", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     // 等待视图加载并使用KVO安全访问属性
     dispatch_async(dispatch_get_main_queue(), ^{
       if ([settingsVC.view isKindOfClass:[UIView class]]) {
@@ -3628,7 +3630,7 @@ speedSettingsItem.detail = trimmedText;
     logViewerItem.title = @"运行日志";
     logViewerItem.detail = @"";
     logViewerItem.type = 0;
-    logViewerItem.svgIconImageName = @"ic_doc_outlined_20";
+    logViewerItem.svgIconImageName = @"ic_doccheckmark_outlined_20";
     logViewerItem.cellType = 26;
     logViewerItem.colorStyle = 0;
     logViewerItem.isEnable = YES;
@@ -3637,26 +3639,12 @@ speedSettingsItem.detail = trimmedText;
       [settingsVC.navigationController pushViewController:page animated:YES];
     };
 
-    AWESettingItemModel *snapshotItem = [[%c(AWESettingItemModel) alloc] init];
-    snapshotItem.identifier = @"DYYYSnapshots";
-    snapshotItem.title = @"配置快照";
-    snapshotItem.detail = @"";
-    snapshotItem.type = 0;
-    snapshotItem.svgIconImageName = @"ic_memorycard_outlined_20";
-    snapshotItem.cellType = 26;
-    snapshotItem.colorStyle = 0;
-    snapshotItem.isEnable = YES;
-    snapshotItem.cellTappedBlock = ^{
-      UIViewController *page = [[DYYYSnapshotViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-      [settingsVC.navigationController pushViewController:page animated:YES];
-    };
-
     AWESettingItemModel *diagnosticsItem = [[%c(AWESettingItemModel) alloc] init];
     diagnosticsItem.identifier = @"DYYYDiagnostics";
     diagnosticsItem.title = @"诊断报告";
     diagnosticsItem.detail = @"一键复制 / 分享";
     diagnosticsItem.type = 0;
-    diagnosticsItem.svgIconImageName = @"ic_health_outlined_20";
+    diagnosticsItem.svgIconImageName = @"ic_monitordatauptrend_outlined_20";
     diagnosticsItem.cellType = 26;
     diagnosticsItem.colorStyle = 0;
     diagnosticsItem.isEnable = YES;
@@ -3665,9 +3653,8 @@ speedSettingsItem.detail = trimmedText;
       [DYYYUtils showToast:@"诊断报告已复制，可通过分享面板发送"];
       [DYYYDiagnostics presentShareSheetForReport];
     };
-    // 快照 / 日志 / 诊断：归到「关于」分区，排在「关于插件」下方
+    // 快照已删；日志 / 诊断归到「关于」分区，排在「关于插件」下方
     [aboutItems addObject:logViewerItem];
-    [aboutItems addObject:snapshotItem];
     [aboutItems addObject:diagnosticsItem];
 
     mainSection.itemArray = mainItems;
@@ -3699,7 +3686,7 @@ speedSettingsItem.detail = trimmedText;
     dashboardTasksItem.title = @"下载任务";
     dashboardTasksItem.detail = [NSString stringWithFormat:@"今日完成 %lu 个", (unsigned long)[[DYYYTaskCenter shared] finishedCountToday]];
     dashboardTasksItem.type = 0;
-    dashboardTasksItem.svgIconImageName = @"ic_download_outlined_20";
+    dashboardTasksItem.svgIconImageName = @"ic_tray_outlined_20";
     dashboardTasksItem.cellType = 26;
     dashboardTasksItem.colorStyle = 0;
     dashboardTasksItem.isEnable = YES;

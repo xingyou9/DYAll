@@ -200,15 +200,14 @@ static void DYYYShareFiles(UIViewController *host, NSArray<NSURL *> *fileURLs, N
 #pragma mark - Table view data source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 4;
+    return 3;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     switch (section) {
         case 0: return self.environmentInfoCache.count;
         case 1: return self.moduleRows.count;
-        case 2: return MAX([DYYYHookManager problemCount], 1);
-        case 3: return [DYYYSafetyGuard isSafeMode] ? 2 : 1;
+        case 2: return [DYYYSafetyGuard isSafeMode] ? 2 : 1;
     }
     return 0;
 }
@@ -217,8 +216,7 @@ static void DYYYShareFiles(UIViewController *host, NSArray<NSURL *> *fileURLs, N
     switch (section) {
         case 0: return @"当前环境";
         case 1: return @"模块状态";
-        case 2: return @"异常与不兼容";
-        case 3: return @"操作";
+        case 2: return @"操作";
     }
     return @"";
 }
@@ -253,22 +251,6 @@ static void DYYYShareFiles(UIViewController *host, NSArray<NSURL *> *fileURLs, N
             break;
         }
         case 2: {
-            NSPredicate *predicate = [NSPredicate predicateWithFormat:@"status == %d OR status == %d", (NSInteger)DYYYHookStatusUnsupported, (NSInteger)DYYYHookStatusFailed];
-            NSArray<DYYYHookRecord *> *problems = [[DYYYHookManager allRecords] filteredArrayUsingPredicate:predicate];
-            if (problems.count == 0) {
-                cell.textLabel.text = @"全部 Hook 正常";
-                cell.detailTextLabel.text = @"";
-            } else if (indexPath.row < (NSInteger)problems.count) {
-                DYYYHookRecord *record = problems[indexPath.row];
-                cell.textLabel.text = record.hookID;
-                cell.detailTextLabel.text = record.detail ?: @"未知原因";
-            } else {
-                cell.textLabel.text = @"";
-                cell.detailTextLabel.text = @"";
-            }
-            break;
-        }
-        case 3: {
             if (indexPath.row == 0) {
                 cell.textLabel.text = @"生成诊断报告";
                 cell.imageView.image = DYYYLineIconNamed(@"doc");
@@ -289,7 +271,7 @@ static void DYYYShareFiles(UIViewController *host, NSArray<NSURL *> *fileURLs, N
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    if (indexPath.section == 3) {
+    if (indexPath.section == 2) {
         if (indexPath.row == 0) {
             NSString *report = [DYYYDiagnostics copyReportToPasteboard];
             [DYYYUtils showToast:@"诊断报告已复制到剪贴板"];

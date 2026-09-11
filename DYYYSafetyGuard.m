@@ -98,14 +98,28 @@ static void DYYYUncaughtExceptionHandler(NSException *exception) {
             [defaults setInteger:(count > 0 ? count - 1 : 0) forKey:kDYYYCrashCountKey];
             [defaults synchronize];
         }
+        // 关键：上次运行全程无崩溃，说明环境已恢复 —— 自动退出安全模式。
+        // （旧实现只递减计数、不清安全模式标记，一旦进入就永久卡死，
+        //   所有实验性 Hook 被静默跳过，用户看起来就是「功能都没效果」）
+        if ([defaults boolForKey:kDYYYSafeModeKey]) {
+            [defaults setBool:NO forKey:kDYYYSafeModeKey];
+            [defaults synchronize];
+            [DYYYLogger info:@"SafetyGuard" message:@"上次运行无异常，已自动退出安全模式，恢复全部功能"];
+        }
     }
 
-    // 4. 稳定运行后清零计数
+    // 4. 稳定运行后清零计数（顺带兜底再清一次安全模式标记）
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kDYYYStableResetSeconds * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      if ([[NSUserDefaults standardUserDefaults] integerForKey:kDYYYCrashCountKey] != 0) {
-          [[NSUserDefaults standardUserDefaults] setInteger:0 forKey:kDYYYCrashCountKey];
-          [[NSUserDefaults standardUserDefaults] synchronize];
+      NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+      if ([d integerForKey:kDYYYCrashCountKey] != 0) {
+          [d setInteger:0 forKey:kDYYYCrashCountKey];
+          [d synchronize];
           [DYYYLogger info:@"SafetyGuard" message:@"运行稳定，连续崩溃计数已清零"];
+      }
+      if ([d boolForKey:kDYYYSafeModeKey]) {
+          [d setBool:NO forKey:kDYYYSafeModeKey];
+          [d synchronize];
+          [DYYYLogger info:@"SafetyGuard" message:@"运行稳定，已自动退出安全模式"];
       }
     });
 
