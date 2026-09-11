@@ -30,6 +30,10 @@
 #import "DYYYTaskCenter.h"
 #import "DYYYDiagnostics.h"
 #import "DYYYUtils.h"
+#import "DYYYFeatureRegistry.h"
+#import "DYYYModeManager.h"
+#import "DYYYPerfMonitor.h"
+#import "DYYDCenterPages.h"
 #import "QDGlassTabBar.h"
 #import "QDExtra.h"
 
@@ -164,6 +168,39 @@ static NSInteger QDCountEnabled(void) {
                            : [UIColor colorWithWhite:1 alpha:0.16];
 }
 
+#pragma mark 5.0 Quick Actions（真实动作）
+
+- (void)applyPerformanceMode {
+    [[DYYYModeManager shared] applyMode:@"performance"];
+    [DYYYUtils showToast:@"性能模式已应用：玻璃重特效与悬浮按钮已收紧"];
+}
+
+- (void)applyImmersiveMode {
+    [[DYYYModeManager shared] applyMode:@"immersive"];
+    [DYYYUtils showToast:@"沉浸模式已应用：全屏播放 + 玻璃跟随视频"];
+}
+
+- (void)openDownload {
+    UIViewController *vc = self.owner;
+    if (!vc) return;
+    UIViewController *page = [[DYYYTaskCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+    [vc.navigationController pushViewController:page animated:DYYDMotionAllowed()];
+}
+
+- (void)openPrivacy {
+    UIViewController *vc = self.owner;
+    if (!vc) return;
+    UIViewController *page = [[DYYYPrivacyCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+    [vc.navigationController pushViewController:page animated:DYYDMotionAllowed()];
+}
+
+- (void)openModes {
+    UIViewController *vc = self.owner;
+    if (!vc) return;
+    UIViewController *page = [[DYYYModeCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+    [vc.navigationController pushViewController:page animated:DYYDMotionAllowed()];
+}
+
 @end
 
 #pragma mark - 主界面搜索（内联浮层，替代独立搜索页）
@@ -230,6 +267,20 @@ static QDHeroSearch *gQDHeroSearch = nil;
         @"title CONTAINS[cd] %@ OR sub CONTAINS[cd] %@ OR id CONTAINS[cd] %@ OR cat CONTAINS[cd] %@",
         text, text, text, text];
     self.results = [DYYYSettingsSearchIndex() filteredArrayUsingPredicate:predicate];
+    // 5.0 模糊搜索：连续包含没命中时，退化为"字符子序列"匹配（如搜"下质"也能命中"下载质量"）
+    if (self.results.count == 0) {
+        NSPredicate *fuzzy = [NSPredicate predicateWithBlock:^BOOL(id item, NSDictionary *bindings) {
+            NSString *hay = [NSString stringWithFormat:@"%@%@%@%@", item[@"title"] ?: @"", item[@"sub"] ?: @"", item[@"id"] ?: @"", item[@"cat"] ?: @"";
+            NSUInteger cursor = 0;
+            for (NSUInteger i = 0; i < text.length; i++) {
+                NSRange found = [hay rangeOfString:[text substringWithRange:NSMakeRange(i, 1)] options:NSCaseInsensitiveSearch range:NSMakeRange(cursor, hay.length - cursor)];
+                if (found.location == NSNotFound) return NO;
+                cursor = found.location + 1;
+            }
+            return YES;
+        }];
+        self.results = [DYYYSettingsSearchIndex() filteredArrayUsingPredicate:fuzzy];
+    }
     [self reposition];
     [self.table reloadData];
     self.panel.hidden = NO;
@@ -452,9 +503,8 @@ static UIView *QDBuildStatusCard(UIViewController *owner) {
     UIView *card = [[UIView alloc] init];
     card.translatesAutoresizingMaskIntoConstraints = NO;
     card.backgroundColor = [UIColor colorWithWhite:1 alpha:0.13];
-    card.layer.cornerRadius = 18;
+    card.layer.cornerRadius = DYYDRadiusCard();
     card.layer.masksToBounds = YES;
-    [card.heightAnchor constraintEqualToConstant:196].active = YES;
 
     UILabel *head = [[UILabel alloc] init];
     head.translatesAutoresizingMaskIntoConstraints = NO;
@@ -463,17 +513,26 @@ static UIView *QDBuildStatusCard(UIViewController *owner) {
     head.textColor = [DYYYSafetyGuard isSafeMode] ? [UIColor colorWithRed:1 green:0.76 blue:0.33 alpha:1]
                                                   : [UIColor colorWithRed:0.35 green:0.95 blue:0.6 alpha:1];
 
+    // 5.0 Dashboard：系统状态 / 兼容性 / 性能（真实内存推算星级）
     NSDictionary<NSString *, NSString *> *env = [DYYYCompatibility environmentInfo];
+    double freeMB = [[DYYYPerfMonitor shared] memoryAvailableMB];
+    NSInteger stars = freeMB < 0 ? 4 : (freeMB > 800 ? 5 : (freeMB > 500 ? 4 : (freeMB > 300 ? 3 : (freeMB > 150 ? 2 : 1))));
+    NSMutableString *starText = [NSMutableString string];
+    for (NSInteger i = 0; i < 5; i++) [starText appendString:(i < stars ? @"★" : @"☆")];
+
+    NSString *compatText = [DYYYCompatibility dependencyCheckPassed]
+        ? [NSString stringWithFormat:@"完全支持 · iOS %@ / 抖音 %@", env[@"iOS 版本"] ?: @"?", env[@"抖音版本"] ?: @"?"]
+        : @"部分依赖缺失，部分功能已停用";
+
     NSString *hooks = [NSString stringWithFormat:@"%lu 项", (unsigned long)[DYYYHookManager allRecords].count];
     NSUInteger problem = [DYYYHookManager problemCount];
     if (problem > 0) hooks = [NSString stringWithFormat:@"%@（异常 %lu）", hooks, (unsigned long)problem];
 
     NSArray<NSArray<NSString *> *> *rows = @[
-        @[ @"shield", @"Hook 状态", hooks ],
-        @[ @"bolt", @"已启用功能", [NSString stringWithFormat:@"%ld 项", (long)[DYYYDiagnostics enabledFeatureCount]] ],
-        @[ @"glass", @"玻璃引擎", QDYTTGlassEngineName() ],
-        @[ @"phone", @"系统 / 抖音", [NSString stringWithFormat:@"iOS %@ · 抖音 %@",
-            env[@"iOS 版本"] ?: @"?", env[@"抖音版本"] ?: @"?"] ],
+        @[ @"bolt", @"兼容性", compatText ],
+        @[ @"shield", @"性能", [NSString stringWithFormat:@"%@（可用 %.0f MB）", starText, MAX(freeMB, 0)] ],
+        @[ @"gear", @"Hook 状态", hooks ],
+        @[ @"phone", @"已启用功能", [NSString stringWithFormat:@"%ld 项", (long)[DYYYDiagnostics enabledFeatureCount]] ],
         @[ @"box", @"下载任务", [NSString stringWithFormat:@"今日完成 %lu · 运行中 %lu",
             (unsigned long)[[DYYYTaskCenter shared] finishedCountToday],
             (unsigned long)[[DYYYTaskCenter shared] activeTasks].count] ],
@@ -522,12 +581,16 @@ static UIView *QDBuildStatusCard(UIViewController *owner) {
 
     [card addSubview:head];
     [card addSubview:vstack];
+    // 高度由内容决定：底部低优先级钉边，systemLayoutSizeFitting 才能算准
+    NSLayoutConstraint *cardBottom = [vstack.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-14];
+    cardBottom.priority = 250;
     [NSLayoutConstraint activateConstraints:@[
         [head.topAnchor constraintEqualToAnchor:card.topAnchor constant:13],
         [head.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16],
         [vstack.topAnchor constraintEqualToAnchor:head.bottomAnchor constant:9],
         [vstack.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16],
         [vstack.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-16],
+        cardBottom,
     ]];
 
     // 点大框直接进状态中心
@@ -768,17 +831,62 @@ static UIView *QDBuildHero(CGFloat width, UIViewController *owner, NSDictionary 
     dispatch_once(&onceToken, ^{ actions = [[QDHeroActions alloc] init]; });
     actions.owner = owner;
 
-    UIButton *yttBtn = QDQuickButton(@"YTT 液态玻璃");
-    [yttBtn addTarget:actions action:@selector(openYTT) forControlEvents:UIControlEventTouchUpInside];
-    UIButton *sysBtn = QDQuickButton(@"系统与性能");
-    [sysBtn addTarget:actions action:@selector(openSystem) forControlEvents:UIControlEventTouchUpInside];
-    UIButton *smoothBtn = QDQuickButton(@"流畅模式");
-    [smoothBtn addTarget:actions action:@selector(toggleSmooth) forControlEvents:UIControlEventTouchUpInside];
-    actions.smoothBtn = smoothBtn;
-    [actions refreshSmooth];
-    [quick addArrangedSubview:yttBtn];
-    [quick addArrangedSubview:sysBtn];
-    [quick addArrangedSubview:smoothBtn];
+    UIButton *perfBtn = QDQuickButton(@"性能模式");
+    [perfBtn addTarget:actions action:@selector(applyPerformanceMode) forControlEvents:UIControlEventTouchUpInside];
+    UIButton *immBtn = QDQuickButton(@"沉浸模式");
+    [immBtn addTarget:actions action:@selector(applyImmersiveMode) forControlEvents:UIControlEventTouchUpInside];
+    UIButton *dlBtn = QDQuickButton(@"下载中心");
+    [dlBtn addTarget:actions action:@selector(openDownload) forControlEvents:UIControlEventTouchUpInside];
+    UIButton *pvBtn = QDQuickButton(@"隐私中心");
+    [pvBtn addTarget:actions action:@selector(openPrivacy) forControlEvents:UIControlEventTouchUpInside];
+    [quick addArrangedSubview:perfBtn];
+    [quick addArrangedSubview:immBtn];
+    [quick addArrangedSubview:dlBtn];
+    [quick addArrangedSubview:pvBtn];
+
+    // ——— 最近使用（来自功能注册表，真实记录） ———
+    UIStackView *recent = [[UIStackView alloc] init];
+    recent.translatesAutoresizingMaskIntoConstraints = NO;
+    recent.axis = UILayoutConstraintAxisVertical;
+    recent.spacing = 5;
+    UIView *recentCard = [[UIView alloc] init];
+    recentCard.translatesAutoresizingMaskIntoConstraints = NO;
+    recentCard.backgroundColor = [UIColor colorWithWhite:1 alpha:0.10];
+    recentCard.layer.cornerRadius = DYYDRadiusLarge();
+    recentCard.layer.masksToBounds = YES;
+    UILabel *recentHead = [[UILabel alloc] init];
+    recentHead.translatesAutoresizingMaskIntoConstraints = NO;
+    recentHead.text = @"最近使用";
+    recentHead.font = [UIFont systemFontOfSize:12 weight:UIFontWeightSemibold];
+    recentHead.textColor = [UIColor colorWithWhite:1 alpha:0.65];
+    [recentCard addSubview:recentHead];
+    [recentCard addSubview:recent];
+    NSArray<NSString *> *recentNames = [[DYYYFeatureRegistry shared] recentlyUsedNames:3];
+    if (recentNames.count == 0) {
+        UILabel *empty = [[UILabel alloc] init];
+        empty.text = @"暂无记录 · 拨动任意开关后这里会显示常用功能";
+        empty.font = [UIFont systemFontOfSize:11.5];
+        empty.textColor = [UIColor colorWithWhite:1 alpha:0.55];
+        [recent addArrangedSubview:empty];
+    } else {
+        for (NSUInteger i = 0; i < recentNames.count; i++) {
+            UILabel *l = [[UILabel alloc] init];
+            l.text = [NSString stringWithFormat:@"%lu. %@", (unsigned long)(i + 1), recentNames[i]];
+            l.font = [UIFont systemFontOfSize:12.5];
+            l.textColor = UIColor.whiteColor;
+            [recent addArrangedSubview:l];
+        }
+    }
+    [NSLayoutConstraint activateConstraints:@[
+        [recentHead.topAnchor constraintEqualToAnchor:recentCard.topAnchor constant:10],
+        [recentHead.leadingAnchor constraintEqualToAnchor:recentCard.leadingAnchor constant:14],
+        [recent.topAnchor constraintEqualToAnchor:recentHead.bottomAnchor constant:6],
+        [recent.leadingAnchor constraintEqualToAnchor:recentCard.leadingAnchor constant:14],
+        [recent.trailingAnchor constraintEqualToAnchor:recentCard.trailingAnchor constant:-14],
+    ]];
+    NSLayoutConstraint *recentBottom = [recent.bottomAnchor constraintEqualToAnchor:recentCard.bottomAnchor constant:-10];
+    recentBottom.priority = 250;
+    [recentBottom setActive:YES];
 
     // ——— 提示条 ———
     UILabel *tip = [[UILabel alloc] init];
@@ -791,6 +899,7 @@ static UIView *QDBuildHero(CGFloat width, UIViewController *owner, NSDictionary 
     [vstack addArrangedSubview:card];
     [vstack addArrangedSubview:QDBuildStatusCard(owner)];
     [vstack addArrangedSubview:quick];
+    [vstack addArrangedSubview:recentCard];
     [vstack addArrangedSubview:tip];
 
     // 钉 top / 左右，底部用低优先级等于：既不与固定高度打架，又能让

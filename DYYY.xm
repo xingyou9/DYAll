@@ -30,6 +30,8 @@
 #import "DYYYHookManager.h"
 #import "DYYYLogger.h"
 #import "DYYYSafetyGuard.h"
+#import "DYYYPerfMonitor.h"
+#import "DYYYCacheManager.h"
 
 static CGFloat gStartY = 0.0;
 static CGFloat gStartVal = 0.0;
@@ -8949,6 +8951,9 @@ static void findTargetViewInView(UIView *view) {
         [DYYYSafetyGuard install];
         [DYYYLogger startup];
         [DYYYCompatibility performStartupChecks];
+        // 5.0：启动时初始化性能中心（注册内存压力自动优化），并做缓存上限自检
+        [DYYYPerfMonitor shared];
+        [[DYYYCacheManager shared] autoCleanIfOverLimit];
     } @catch (NSException *startupException) {
         NSLog(@"[DYYY] 启动初始化异常（已忽略继续）: %@", startupException);
     }

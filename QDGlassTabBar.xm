@@ -36,6 +36,8 @@
 
 #import "AwemeHeaders.h"
 #import "DYYYUtils.h"
+#import "DYYYPerfMonitor.h"
+#import "DYYYModeManager.h"
 
 #pragma mark - 偏好键
 
@@ -1423,6 +1425,8 @@ static void QDYTTTick(UIView *hint) {
     static NSUInteger tick = 0;
     tick++;
     if (tick % 12 == 0) QDYTTExtendApply();   // 背景延伸较贵，降频
+    // 性能中心低内存降级：内存压力期间暂停变色采样与背景延伸（自动优化）
+    if ([DYYYPerfMonitor lowMemoryWarningActive]) return;
     if (tick % 4 == 0) QDYTTAutoTintSweep();  // 首页视频全屏播放：底栏颜色跟随视频（1s 一次，成本极低）
 }
 
@@ -1501,5 +1505,12 @@ static void QDYTTStartHeartbeat(void) {
 // 构造函数的时序不一定早于这些类的注册，所以放在 +load 里，并自己保证幂等。
 %ctor {
     QDYTTGlassRegisterDefaults();
+    // 5.0：模式切换 / 功能注册表变更后立即重跑玻璃引擎
+    [[NSNotificationCenter defaultCenter] addObserverForName:DYYYModeDidChangeNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+        QDYTTGlassRefresh();
+    }];
+    [[NSNotificationCenter defaultCenter] addObserverForName:DYYYFeatureDidChangeNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification *note) {
+        QDYTTGlassRefresh();
+    }];
     QDYTTStartHeartbeat();
 }

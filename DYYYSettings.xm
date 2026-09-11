@@ -25,6 +25,8 @@
 #import "DYYYSettingsIndex.h"
 #import "DYYYSystemPages.h"
 #import "DYYYTaskCenter.h"
+#import "DYYYConfigManager.h"
+#import "DYYDCenterPages.h"
 
 @class DYYYIconOptionsDialogView;
 static void showIconOptionsDialog(NSString *title, UIImage *previewImage, NSString *saveFilename, void (^onClear)(void), void (^onSelect)(void));
@@ -3656,6 +3658,108 @@ speedSettingsItem.detail = trimmedText;
     // 快照已删；日志 / 诊断归到「关于」分区，排在「关于插件」下方
     [aboutItems addObject:logViewerItem];
     [aboutItems addObject:diagnosticsItem];
+
+    // ===== 5.0 配置管理（导出 / 恢复最近备份） =====
+    AWESettingItemModel *configExportItem = [[%c(AWESettingItemModel) alloc] init];
+    configExportItem.identifier = @"DYYYConfigExport";
+    configExportItem.title = @"导出配置";
+    configExportItem.detail = @"JSON · Schema 5.0";
+    configExportItem.type = 0;
+    configExportItem.svgIconImageName = @"ic_tray_outlined_20";
+    configExportItem.cellType = 26;
+    configExportItem.colorStyle = 0;
+    configExportItem.isEnable = YES;
+    configExportItem.cellTappedBlock = ^{
+      NSError *err = nil;
+      NSString *path = [[DYYYConfigManager shared] exportConfigWithError:&err];
+      if (path) {
+        [DYYYUtils showToast:[NSString stringWithFormat:@"已导出：%@", [path lastPathComponent]]];
+      } else {
+        [DYYYUtils showToast:[NSString stringWithFormat:@"导出失败：%@", err.localizedDescription ?: @"未知错误"]];
+      }
+    };
+    [aboutItems addObject:configExportItem];
+
+    AWESettingItemModel *configRestoreItem = [[%c(AWESettingItemModel) alloc] init];
+    configRestoreItem.identifier = @"DYYYConfigRestore";
+    configRestoreItem.title = @"恢复最近备份";
+    configRestoreItem.detail = @"升级前自动备份";
+    configRestoreItem.type = 0;
+    configRestoreItem.svgIconImageName = @"ic_tray_outlined_20";
+    configRestoreItem.cellType = 26;
+    configRestoreItem.colorStyle = 0;
+    configRestoreItem.isEnable = YES;
+    configRestoreItem.cellTappedBlock = ^{
+      NSError *err = nil;
+      NSUInteger n = [[DYYYConfigManager shared] restoreLatestBackup:&err];
+      if (n > 0) {
+        [DYYYUtils showToast:[NSString stringWithFormat:@"已恢复 %lu 项配置，重启抖音生效", (unsigned long)n]];
+      } else {
+        [DYYYUtils showToast:err.localizedDescription ?: @"尚无自动备份"];
+      }
+    };
+    [aboutItems addObject:configRestoreItem];
+
+    // ===== 5.0 中心页入口 =====
+    AWESettingItemModel *modeCenterItem = [[%c(AWESettingItemModel) alloc] init];
+    modeCenterItem.identifier = @"DYYYModeCenter";
+    modeCenterItem.title = @"模式中心";
+    modeCenterItem.detail = [[DYYYModeManager shared] subtitleForMode:[[DYYYModeManager shared] currentModeID]];
+    modeCenterItem.type = 0;
+    modeCenterItem.svgIconImageName = @"ic_switch_outlined";
+    modeCenterItem.cellType = 26;
+    modeCenterItem.colorStyle = 0;
+    modeCenterItem.isEnable = YES;
+    modeCenterItem.cellTappedBlock = ^{
+      UIViewController *page = [[DYYYModeCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+    [mainItems addObject:modeCenterItem];
+
+    AWESettingItemModel *perfCenterItem = [[%c(AWESettingItemModel) alloc] init];
+    perfCenterItem.identifier = @"DYYYPerfCenter";
+    perfCenterItem.title = @"性能中心";
+    perfCenterItem.detail = @"内存 / CPU / 帧率 · 自动优化";
+    perfCenterItem.type = 0;
+    perfCenterItem.svgIconImageName = @"ic_monitordatauptrend_outlined_20";
+    perfCenterItem.cellType = 26;
+    perfCenterItem.colorStyle = 0;
+    perfCenterItem.isEnable = YES;
+    perfCenterItem.cellTappedBlock = ^{
+      UIViewController *page = [[DYYYPerfCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+    [mainItems addObject:perfCenterItem];
+
+    AWESettingItemModel *cacheCenterItem = [[%c(AWESettingItemModel) alloc] init];
+    cacheCenterItem.identifier = @"DYYYCacheCenter";
+    cacheCenterItem.title = @"缓存管理";
+    cacheCenterItem.detail = @"按类型清理 · 上限自动清理";
+    cacheCenterItem.type = 0;
+    cacheCenterItem.svgIconImageName = @"ic_tray_outlined_20";
+    cacheCenterItem.cellType = 26;
+    cacheCenterItem.colorStyle = 0;
+    cacheCenterItem.isEnable = YES;
+    cacheCenterItem.cellTappedBlock = ^{
+      UIViewController *page = [[DYYYCacheCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+    [mainItems addObject:cacheCenterItem];
+
+    AWESettingItemModel *privacyCenterItem = [[%c(AWESettingItemModel) alloc] init];
+    privacyCenterItem.identifier = @"DYYYPrivacyCenter";
+    privacyCenterItem.title = @"隐私中心";
+    privacyCenterItem.detail = @"数据仅保存在本机";
+    privacyCenterItem.type = 0;
+    privacyCenterItem.svgIconImageName = @"ic_shieldcheckmark_outlined_20";
+    privacyCenterItem.cellType = 26;
+    privacyCenterItem.colorStyle = 0;
+    privacyCenterItem.isEnable = YES;
+    privacyCenterItem.cellTappedBlock = ^{
+      UIViewController *page = [[DYYYPrivacyCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [settingsVC.navigationController pushViewController:page animated:YES];
+    };
+    [mainItems addObject:privacyCenterItem];
 
     mainSection.itemArray = mainItems;
     aboutSection.itemArray = aboutItems;

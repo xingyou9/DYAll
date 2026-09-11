@@ -22,6 +22,7 @@
 
 #import "DYYYSettingsHelper.h"
 #import "DYYYUtils.h"
+#import "DYYYFeatureRegistry.h"
 #import "QDGlassTabBar.h"
 
 #define QD_PREF(key) [[NSUserDefaults standardUserDefaults] boolForKey:key]
@@ -289,7 +290,36 @@ static NSArray<NSString *> *QDTransparencyKeys(void) {
 - (void)toggleChanged:(UISwitch *)sw {
     NSString *key = objc_getAssociatedObject(sw, "qd_pref_key");
     if (!key) return;
-    QD_SET(key, sw.on);
+    DYYYFeatureDescriptor *feature = [[DYYYFeatureRegistry shared] featureForPrefKey:key];
+    if (feature && sw.on) {
+        // 5.0 冲突检测：开启前先查冲突，给用户自动解决入口
+        NSArray<NSString *> *conflicts = [[DYYYFeatureRegistry shared] conflictNamesIfEnabling:feature];
+        if (conflicts.count > 0) {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"检测到功能冲突"
+                message:[NSString stringWithFormat:@"%@ 与 %@ 无法同时使用。", feature.displayName, [conflicts componentsJoinedByString:@"、"]]
+                preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:@"自动解决（关闭冲突功能）" style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
+                for (NSString *name in conflicts) {
+                    DYYYFeatureDescriptor *other = nil;
+                    for (DYYYFeatureDescriptor *f in [[DYYYFeatureRegistry shared] allFeatures]) {
+                        if ([f.displayName isEqualToString:name]) { other = f; break; }
+                    }
+                    if (other) [[DYYYFeatureRegistry shared] setEnabled:NO forFeature:other];
+                }
+                [[DYYYFeatureRegistry shared] setEnabled:YES forFeature:feature];
+                [DYYYUtils showToast:[NSString stringWithFormat:@"%@ 已开启，冲突功能已关闭", feature.displayName]];
+            }]];
+            [alert addAction:[UIAlertAction actionWithTitle:@"手动处理" style:UIAlertActionStyleCancel handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
+            sw.on = NO;   // 回弹开关，等用户选择
+            return;
+        }
+        [[DYYYFeatureRegistry shared] setEnabled:YES forFeature:feature];
+    } else if (feature) {
+        [[DYYYFeatureRegistry shared] setEnabled:NO forFeature:feature];
+    } else {
+        QD_SET(key, sw.on);
+    }
     if ([QDTransparencyKeys() containsObject:key]) {
         [[NSNotificationCenter defaultCenter] postNotificationName:@"DYYYGlobalTransparencyDidChangeNotification" object:nil];
     }

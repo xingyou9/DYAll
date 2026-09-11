@@ -15,6 +15,40 @@ static NSString *const kDefaultRemoteConfigURL = DYYY_DEFAULT_ABTEST_URL;
 static NSString *const kDYYYTabBarHeightKey = @"DYYYTabBarHeight";
 static NSString *const kDYYYABTestTabBarHeightConfigKey = @"hp_tab_bar_custom_height_config";
 
+// ===== 5.0 远程配置安全校验层 =====
+// 键白名单（正则）+ 值类型白名单 + 深度/数量限制 + 总大小限制。
+// 远程数据必须先通过本函数才能进入应用流程，杜绝"下载即执行"。
+static BOOL DYYYValidateABTestDataDeep(id obj, NSInteger depth) {
+    if (depth > 6) return NO;                                   // 嵌套深度限制
+    if (![obj isKindOfClass:[NSDictionary class]]) return NO;
+    if ([(NSDictionary *)obj count] > 200) return NO;           // 键数量限制
+    static NSRegularExpression *keyRe = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        keyRe = [NSRegularExpression regularExpressionWithPattern:@"^[A-Za-z0-9_.]{1,64}$" options:0 error:nil];
+    });
+    for (NSString *key in obj) {
+        if (![key isKindOfClass:[NSString class]]) return NO;
+        if ([keyRe firstMatchInString:key options:0 range:NSMakeRange(0, key.length)] == nil) return NO;
+        id value = obj[key];
+        BOOL typeOK = [value isKindOfClass:[NSString class]] || [value isKindOfClass:[NSNumber class]]
+                   || [value isKindOfClass:[NSArray class]] || [value isKindOfClass:[NSDictionary class]];
+        if (!typeOK) return NO;
+        if ([value isKindOfClass:[NSString class]] && [(NSString *)value length] > 4096) return NO;  // 单值大小限制
+        if ([value isKindOfClass:[NSDictionary class]] && !DYYYValidateABTestDataDeep(value, depth + 1)) return NO;
+        if ([value isKindOfClass:[NSArray class]]) {
+            for (id item in (NSArray *)value) {
+                if (![item isKindOfClass:[NSString class]] && ![item isKindOfClass:[NSNumber class]]) return NO;
+            }
+        }
+    }
+    return YES;
+}
+
+static BOOL DYYYValidateABTestData(id obj) {
+    return DYYYValidateABTestDataDeep(obj, 0);
+}
+
 static dispatch_once_t s_loadOnceToken;
 static dispatch_queue_t s_abTestHookQueue;
 static dispatch_once_t s_queueOnceToken;
@@ -238,7 +272,7 @@ static void DYYYApplyTabBarHeightToCurrentABTestDataIfNeeded(void) {
 
         if (jsonData) {
             NSDictionary *loadedData = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&error];
-            if (loadedData && !error) {
+            if (loadedData && !error && DYYYValidateABTestData(loadedData)) {
                 id modeValue = loadedData[@"mode"];
                 s_fileMode = nil;
                 if ([modeValue isKindOfClass:[NSString class]]) {
@@ -250,10 +284,17 @@ static void DYYYApplyTabBarHeightToCurrentABTestDataIfNeeded(void) {
                     [tmp removeObjectForKey:@"mode"];
                     actualData = [tmp copy];
                 }
-                s_localABTestData = [actualData copy];
-                NSLog(@"[DYYY] ABTest本地配置已从文件加载成功");
+                if (actualData && DYYYValidateABTestData(actualData)) {
+                    s_localABTestData = [actualData copy];
+                    NSLog(@"[DYYY] ABTest本地配置已从文件加载成功");
+                    return;
+                }
+                s_localABTestData = nil;
+                NSLog(@"[DYYY] ABTest配置未通过安全校验，已忽略（回退默认）");
                 return;
-            } else {
+            } else if (loadedData && !error) {
+                NSLog(@"[DYYY] ABTest配置未通过安全校验，已忽略（回退默认）");
+            } else if (error || !loadedData) {
                 NSLog(@"[DYYY] ABTest本地配置解析失败: %@", error.localizedDescription);
             }
         } else {
@@ -360,6 +401,10 @@ static void DYYYApplyTabBarHeightToCurrentABTestDataIfNeeded(void) {
                                                                          if (!validationError) {
                                                                              validationError = [NSError errorWithDomain:@"com.dyyy.remoteconfig" code:-1 userInfo:@{NSLocalizedDescriptionKey : @"配置格式错误"}];
                                                                          }
+                                                                     } else if (!DYYYValidateABTestData(jsonObject)) {
+                                                                         // 5.0 安全校验：键白名单 / 值类型 / 数量与大小限制
+                                                                         validationError = [NSError errorWithDomain:@"com.dyyy.remoteconfig" code:-2 userInfo:@{NSLocalizedDescriptionKey : @"配置未通过安全校验"}];
+                                                                         [DYYYLogger warning:@"RemoteConfig" message:@"远程 ABTest 配置未通过校验，已拒绝应用"];
                                                                      } else {
                                                                          NSArray *paths = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
                                                                          NSString *documentsDirectory = [paths firstObject];
