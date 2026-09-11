@@ -26,6 +26,7 @@
 #import "DYYYSystemPages.h"
 #import "DYYYTaskCenter.h"
 #import "DYYYConfigManager.h"
+#import "DYYYModeManager.h"
 #import "DYYDCenterPages.h"
 
 @class DYYYIconOptionsDialogView;
