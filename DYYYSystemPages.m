@@ -749,7 +749,7 @@ static BOOL DYYYApplySettingsSnapshot(NSDictionary *snapshot) {
 
     if (alert.popoverPresentationController) {
         alert.popoverPresentationController.sourceView = self.view;
-        alert.popoverPresentationController.sourceRect = self.tableView.rectForRowAtIndexPath:indexPath;
+        alert.popoverPresentationController.sourceRect = [self.tableView rectForRowAtIndexPath:indexPath];
     }
     [self presentViewController:alert animated:YES completion:nil];
 }
