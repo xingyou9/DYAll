@@ -883,7 +883,7 @@ static UIImage *QDFloatIconCached(NSInteger kind, BOOL selected) {
             }
         }
     }];
-    img.renderingMode = UIImageRenderingModeAlwaysTemplate;
+    img = [img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     cache[key] = img;
     return img;
 }

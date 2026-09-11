@@ -24,6 +24,7 @@
 #import "DYYYSettingsHelper.h"
 #import "DYYYSettingsIndex.h"
 #import "DYYYSystemPages.h"
+#import "DYYYCompatibility.h"
 #import "DYYYHookManager.h"
 #import "DYYYSafetyGuard.h"
 #import "DYYYTaskCenter.h"
