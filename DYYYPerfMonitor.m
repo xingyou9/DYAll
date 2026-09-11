@@ -4,7 +4,6 @@
 #import <QuartzCore/QuartzCore.h>
 #import <mach/mach.h>
 #import <sys/sysctl.h>
-#import <libproc.h>
 #import <os/proc.h>
 
 NSString * const DYYYPerfOptimizeNotification = @"DYYYPerfOptimizeNotification";
@@ -83,13 +82,17 @@ BOOL DYYYPerfLowMemoryActive(void) {
 }
 
 - (double)cpuUsagePercent {
-    struct proc_taskinfo pti;
-    if (proc_pidinfo(getpid(), PROC_PIDTASKINFO, 0, &pti, sizeof(pti)) < (int)sizeof(pti)) return -1;
-    uint64_t t1 = pti.pti_total_user + pti.pti_total_system;
+    // 公开 API：MACH_TASK_BASIC_INFO 累计 CPU 时间，双窗采样求占比
+    struct mach_task_basic_info info;
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) != KERN_SUCCESS) return -1;
+    uint64_t t1 = (uint64_t)info.user_time.seconds * 1000000000ULL + (uint64_t)info.user_time.microseconds * 1000ULL
+                + (uint64_t)info.system_time.seconds * 1000000000ULL + (uint64_t)info.system_time.microseconds * 1000ULL;
     usleep(200 * 1000);
-    if (proc_pidinfo(getpid(), PROC_PIDTASKINFO, 0, &pti, sizeof(pti)) < (int)sizeof(pti)) return -1;
-    uint64_t t2 = pti.pti_total_user + pti.pti_total_system;
-    // 采样窗 200ms → 占比 = 增量 / (200ms * 频率)。mach 绝对时间是纳秒。
+    count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &count) != KERN_SUCCESS) return -1;
+    uint64_t t2 = (uint64_t)info.user_time.seconds * 1000000000ULL + (uint64_t)info.user_time.microseconds * 1000ULL
+                + (uint64_t)info.system_time.seconds * 1000000000ULL + (uint64_t)info.system_time.microseconds * 1000ULL;
     double deltaNs = (double)(t2 - t1);
     double percent = deltaNs / (200.0 * 1000.0 * 1000.0) * 100.0;
     return MIN(percent, 100.0);
