@@ -17,6 +17,121 @@
 
 #pragma mark - 通用样式工具
 
+// 自绘黑色线性图标（与设置行线稿风格一致，替代 emoji）
+static UIImage *DYYYLineIconNamed(NSString *kind) {
+    static NSMutableDictionary *cache;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ cache = [NSMutableDictionary dictionary]; });
+    UIImage *cached = cache[kind];
+    if (cached) return cached;
+
+    UIGraphicsImageRendererFormat *fmt = [[UIGraphicsImageRendererFormat alloc] init];
+    fmt.scale = [UIScreen mainScreen].scale;
+    fmt.opaque = NO;
+    UIGraphicsImageRenderer *r = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(18, 18) format:fmt];
+    UIImage *img = [r imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        [UIColor.blackColor setStroke];
+        [UIColor.blackColor setFill];
+        UIBezierPath *p = [UIBezierPath bezierPath];
+        p.lineCapStyle = kCGLineCapRound;
+        p.lineJoinStyle = kCGLineJoinRound;
+        [p setLineWidth:1.7];
+
+        if ([kind isEqualToString:@"gear"]) {              // 元抖核心
+            [p appendPath:[UIBezierPath bezierPathWithArcCenter:CGPointMake(9, 9) radius:3.4 startAngle:0 endAngle:M_PI * 2 clockwise:YES]];
+            [p stroke];
+            for (int i = 0; i < 8; i++) {
+                CGFloat a = i * M_PI / 4.0;
+                [p removeAllPoints];
+                [p moveToPoint:CGPointMake(9 + cosf(a) * 5.4, 9 + sinf(a) * 5.4)];
+                [p addLineToPoint:CGPointMake(9 + cosf(a) * 7.6, 9 + sinf(a) * 7.6)];
+                [p stroke];
+            }
+        } else if ([kind isEqualToString:@"shield"]) {     // Hook Safe Guard
+            [p moveToPoint:CGPointMake(9, 1.8)];
+            [p addLineToPoint:CGPointMake(15, 4)];
+            [p addLineToPoint:CGPointMake(15, 8.6)];
+            [p addCurveToPoint:CGPointMake(9, 16.2) controlPoint1:CGPointMake(15, 12.2) controlPoint2:CGPointMake(12.6, 15.1)];
+            [p addCurveToPoint:CGPointMake(3, 8.6) controlPoint1:CGPointMake(5.4, 15.1) controlPoint2:CGPointMake(3, 12.2)];
+            [p addLineToPoint:CGPointMake(3, 4)];
+            [p closePath];
+            [p stroke];
+        } else if ([kind isEqualToString:@"cross"]) {      // 崩溃防护
+            UIBezierPath *plus = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(6.6, 2.5, 4.8, 13) cornerRadius:1.6];
+            [plus appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(2.5, 6.6, 13, 4.8) cornerRadius:1.6]];
+            [plus fill];
+        } else if ([kind isEqualToString:@"box"]) {        // 任务中心
+            [p moveToPoint:CGPointMake(9, 2.2)];
+            [p addLineToPoint:CGPointMake(9, 10.6)];
+            [p stroke];
+            [p removeAllPoints];
+            [p moveToPoint:CGPointMake(5.4, 7.6)];
+            [p addLineToPoint:CGPointMake(9, 11.2)];
+            [p addLineToPoint:CGPointMake(12.6, 7.6)];
+            [p stroke];
+            [p removeAllPoints];
+            [p moveToPoint:CGPointMake(3, 12.4)];
+            [p addLineToPoint:CGPointMake(3, 14.2)];
+            [p addCurveToPoint:CGPointMake(4.8, 16) controlPoint1:CGPointMake(3, 15.2) controlPoint2:CGPointMake(3.8, 16)];
+            [p addLineToPoint:CGPointMake(13.2, 16)];
+            [p addCurveToPoint:CGPointMake(15, 14.2) controlPoint1:CGPointMake(14.2, 16) controlPoint2:CGPointMake(15, 15.2)];
+            [p addLineToPoint:CGPointMake(15, 12.4)];
+            [p stroke];
+        } else if ([kind isEqualToString:@"magnifier"]) {  // 设置搜索索引
+            [p appendPath:[UIBezierPath bezierPathWithArcCenter:CGPointMake(7.6, 7.6) radius:4.6 startAngle:0 endAngle:M_PI * 2 clockwise:YES]];
+            [p stroke];
+            [p removeAllPoints];
+            [p moveToPoint:CGPointMake(10.9, 10.9)];
+            [p addLineToPoint:CGPointMake(15.4, 15.4)];
+            [p stroke];
+        } else if ([kind isEqualToString:@"puzzle"]) {     // 依赖检查
+            UIBezierPath *g = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(2.8, 2.8, 5.6, 5.6) cornerRadius:1.4];
+            [g appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(9.6, 2.8, 5.6, 5.6) cornerRadius:1.4]];
+            [g appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(2.8, 9.6, 5.6, 5.6) cornerRadius:1.4]];
+            [g appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(9.6, 9.6, 5.6, 5.6) cornerRadius:1.4]];
+            [g stroke];
+        } else if ([kind isEqualToString:@"doc"]) {        // 诊断报告
+            UIBezierPath *page = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(3.5, 2, 9.5, 14) cornerRadius:2];
+            page.lineCapStyle = kCGLineCapRound;
+            [page setLineWidth:1.7];
+            [page stroke];
+            [p moveToPoint:CGPointMake(6, 6.4)];
+            [p addLineToPoint:CGPointMake(10.5, 6.4)];
+            [p stroke];
+            [p removeAllPoints];
+            [p moveToPoint:CGPointMake(6, 9.4)];
+            [p addLineToPoint:CGPointMake(10.5, 9.4)];
+            [p stroke];
+            [p removeAllPoints];
+            [p moveToPoint:CGPointMake(6, 12.4)];
+            [p addLineToPoint:CGPointMake(9, 12.4)];
+            [p stroke];
+        } else if ([kind isEqualToString:@"exit"]) {       // 退出安全模式
+            [p moveToPoint:CGPointMake(11, 2.6)];
+            [p addLineToPoint:CGPointMake(4.6, 2.6)];
+            [p addCurveToPoint:CGPointMake(3.4, 3.8) controlPoint1:CGPointMake(3.9, 2.6) controlPoint2:CGPointMake(3.4, 3.1)];
+            [p addLineToPoint:CGPointMake(3.4, 14.2)];
+            [p addCurveToPoint:CGPointMake(4.6, 15.4) controlPoint1:CGPointMake(3.4, 14.9) controlPoint2:CGPointMake(3.9, 15.4)];
+            [p addLineToPoint:CGPointMake(11, 15.4)];
+            [p stroke];
+            [p removeAllPoints];
+            [p moveToPoint:CGPointMake(8, 9)];
+            [p addLineToPoint:CGPointMake(15.2, 9)];
+            [p stroke];
+            [p removeAllPoints];
+            [p moveToPoint:CGPointMake(12.6, 6)];
+            [p addLineToPoint:CGPointMake(15.4, 9)];
+            [p addLineToPoint:CGPointMake(12.6, 12)];
+            [p stroke];
+        } else {
+            return;
+        }
+    }];
+    img = [img imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    cache[kind] = img;
+    return img;
+}
+
 static UIColor *DYYYPageBackgroundColor(void) {
     return [DYYYUtils isDarkMode] ? [UIColor colorWithRed:0.07 green:0.07 blue:0.08 alpha:1.0] : [UIColor colorWithRed:0.95 green:0.96 blue:0.97 alpha:1.0];
 }
@@ -73,12 +188,12 @@ static void DYYYShareFiles(UIViewController *host, NSArray<NSURL *> *fileURLs, N
 
 - (NSArray<NSDictionary *> *)moduleRows {
     return @[
-        @{ @"name" : @"元抖核心", @"icon" : @"⚙️", @"status" : @"正常运行" },
-        @{ @"name" : @"Hook Safe Guard", @"icon" : @"🛡️", @"status" : [DYYYHookManager summaryText] },
-        @{ @"name" : @"崩溃防护", @"icon" : @"🚑", @"status" : [DYYYSafetyGuard isSafeMode] ? @"安全模式" : [NSString stringWithFormat:@"正常（计数 %lu）", (unsigned long)[DYYYSafetyGuard consecutiveCrashCount]] },
-        @{ @"name" : @"任务中心", @"icon" : @"📦", @"status" : [NSString stringWithFormat:@"运行中 %lu / 今日完成 %lu", (unsigned long)[[DYYYTaskCenter shared] activeTasks].count, (unsigned long)[[DYYYTaskCenter shared] finishedCountToday]] },
-        @{ @"name" : @"设置搜索索引", @"icon" : @"🔎", @"status" : [NSString stringWithFormat:@"%lu 项", (unsigned long)DYYYSettingsSearchIndex().count] },
-        @{ @"name" : @"依赖检查", @"icon" : @"🧩", @"status" : [DYYYCompatibility dependencyCheckPassed] ? @"全部通过" : @"存在缺失（部分功能不可用）" },
+        @{ @"name" : @"元抖核心", @"icon" : @"gear", @"status" : @"正常运行" },
+        @{ @"name" : @"Hook Safe Guard", @"icon" : @"shield", @"status" : [DYYYHookManager summaryText] },
+        @{ @"name" : @"崩溃防护", @"icon" : @"cross", @"status" : [DYYYSafetyGuard isSafeMode] ? @"安全模式" : [NSString stringWithFormat:@"正常（计数 %lu）", (unsigned long)[DYYYSafetyGuard consecutiveCrashCount]] },
+        @{ @"name" : @"任务中心", @"icon" : @"box", @"status" : [NSString stringWithFormat:@"运行中 %lu / 今日完成 %lu", (unsigned long)[[DYYYTaskCenter shared] activeTasks].count, (unsigned long)[[DYYYTaskCenter shared] finishedCountToday]] },
+        @{ @"name" : @"设置搜索索引", @"icon" : @"magnifier", @"status" : [NSString stringWithFormat:@"%lu 项", (unsigned long)DYYYSettingsSearchIndex().count] },
+        @{ @"name" : @"依赖检查", @"icon" : @"puzzle", @"status" : [DYYYCompatibility dependencyCheckPassed] ? @"全部通过" : @"存在缺失（部分功能不可用）" },
     ];
 }
 
@@ -131,7 +246,9 @@ static void DYYYShareFiles(UIViewController *host, NSArray<NSURL *> *fileURLs, N
         case 1: {
             NSArray<NSDictionary *> *rows = self.moduleRows;
             NSDictionary *row = rows[indexPath.row];
-            cell.textLabel.text = [NSString stringWithFormat:@"%@ %@", row[@"icon"], row[@"name"]];
+            cell.textLabel.text = row[@"name"];
+            cell.imageView.image = DYYYLineIconNamed(row[@"icon"]);
+            cell.imageView.tintColor = cell.textLabel.textColor;
             cell.detailTextLabel.text = row[@"status"];
             break;
         }
@@ -153,14 +270,17 @@ static void DYYYShareFiles(UIViewController *host, NSArray<NSURL *> *fileURLs, N
         }
         case 3: {
             if (indexPath.row == 0) {
-                cell.textLabel.text = @"📋 生成诊断报告";
+                cell.textLabel.text = @"生成诊断报告";
+                cell.imageView.image = DYYYLineIconNamed(@"doc");
                 cell.detailTextLabel.text = @"";
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             } else {
-                cell.textLabel.text = @"🚪 退出安全模式";
+                cell.textLabel.text = @"退出安全模式";
+                cell.imageView.image = DYYYLineIconNamed(@"exit");
                 cell.detailTextLabel.text = @"重启抖音后完整恢复";
                 cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             }
+            cell.imageView.tintColor = cell.textLabel.textColor;
             break;
         }
     }
@@ -389,7 +509,7 @@ static void DYYYShareFiles(UIViewController *host, NSArray<NSURL *> *fileURLs, N
     switch (record.state) {
         case DYYYTaskStateDone:      icon = @"√"; break;
         case DYYYTaskStateFailed:    icon = @"×"; break;
-        case DYYYTaskStateCancelled: icon = @"🚫"; break;
+        case DYYYTaskStateCancelled: icon = @"○"; break;
         default:                     icon = @"…"; break;
     }
     cell.textLabel.text = [NSString stringWithFormat:@"%@ %@ [%@]", icon, record.title, record.type ?: @"任务"];
