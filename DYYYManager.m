@@ -904,7 +904,7 @@
     [DYYYLogger warning:@"Download" message:[NSString stringWithFormat:@"下载失败，0.5s 后自动重试（第 1 次）：%@", taskURL]];
 
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      [[DYYYManager shared] downloadMediaWithProgress:taskURL
+      [DYYYManager downloadMediaWithProgress:taskURL
                                             mediaType:retryType
                                                 audio:taskAudioURL
                                              progress:nil
