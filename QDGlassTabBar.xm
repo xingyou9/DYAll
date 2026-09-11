@@ -90,6 +90,7 @@ static CFTimeInterval gQDLastTick = 0;  // 底栏树遍历节流时间戳
 
 // —— 悬浮胶囊引擎的运行时状态 ——
 static UITabBar *gFloatBar = nil;                 // 自建的系统 UITabBar（iOS 26+ 自带液态玻璃胶囊）
+static id gFloatGlassEffect = nil;                // 胶囊的 UIGlassEffect 实例，变色采样直接给它上色
 static id gFloatProxy = nil;                      // 它的 delegate
 static NSArray<NSNumber *> *gFloatKinds = nil;    // 与 items 同序；-1 = 拍摄
 static NSArray *gFloatButtons = nil;              // 与 items 同序的抖音原始按钮
@@ -695,26 +696,28 @@ static void QDYTTExtendApply(void) {
 
 #pragma mark - 首页视频全屏播放：底栏颜色自动跟随视频画面
 
-// 采样当前视频帧的平均色（缩到 10x10 求均值），垫一层同色洗色层在视频底部、
-// 悬浮玻璃后面——玻璃透出的就是视频的颜色，画面变了底栏颜色跟着变。
+// 采样当前视频帧的平均色（缩到 10x10 求均值），直接给悬浮胶囊的 UIGlassEffect 上色。
+// 5.0.1 修正：旧实现往视频底部塞一层 55% 透明度的洗色层，正好盖住文案 / 作者名 / 评论区，
+// 深色画面下就是用户截图里的「背景发黑块」。现在只改玻璃自身的 tintColor，
+// 不往视频视图里加任何东西，内容零污染。
+
+static void QDYTTAutoTintReset(void) {
+    if (gFloatGlassEffect) {
+        @try {
+            if ([gFloatGlassEffect respondsToSelector:@selector(setTintColor:)]) {
+                // 回到 Clear 档默认的近无色着色
+                [gFloatGlassEffect setValue:[UIColor colorWithWhite:0 alpha:0.06] forKey:@"tintColor"];
+            }
+        } @catch (__unused NSException *e) {
+        }
+    }
+}
+
 static void QDYTTAutoTintApply(UIView *video) {
     if (!video || !video.window) return;
+    if (!gFloatBar || !gFloatGlassEffect) return;   // 仅悬浮胶囊引擎支持变色
 
-    UIView *wash = objc_getAssociatedObject(video, "qd_tint_wash");
-    if (!wash) {
-        wash = [[UIView alloc] init];
-        wash.userInteractionEnabled = NO;
-        wash.translatesAutoresizingMaskIntoConstraints = NO;
-        [video addSubview:wash];
-        [wash.leadingAnchor constraintEqualToAnchor:video.leadingAnchor].active = YES;
-        [wash.trailingAnchor constraintEqualToAnchor:video.trailingAnchor].active = YES;
-        [wash.bottomAnchor constraintEqualToAnchor:video.bottomAnchor].active = YES;
-        [wash.heightAnchor constraintEqualToConstant:140].active = YES;
-        objc_setAssociatedObject(video, "qd_tint_wash", wash, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-
-    // 采样时把洗色层暂时隐藏，避免「采样到自己的颜色」正反馈
-    wash.hidden = YES;
+    // 采样视频帧平均色
     UIGraphicsImageRendererFormat *fmt = [[UIGraphicsImageRendererFormat alloc] init];
     fmt.scale = 1.0;
     fmt.opaque = YES;
@@ -722,7 +725,6 @@ static void QDYTTAutoTintApply(UIView *video) {
     UIImage *snap = [r imageWithActions:^(__unused UIGraphicsImageRendererContext *ctx) {
         [video drawViewHierarchyInRect:video.bounds afterScreenUpdates:NO];
     }];
-    wash.hidden = NO;
     CGImageRef cg = snap.CGImage;
     if (!cg) return;
 
@@ -743,23 +745,29 @@ static void QDYTTAutoTintApply(UIView *video) {
     }
     CGFloat rr = rSum / 100.0 / 255.0, gg = gSum / 100.0 / 255.0, bb = bSum / 100.0 / 255.0;
 
-    // 与上次颜色几乎一样就跳过，避免反复动画
-    UIColor *prev = objc_getAssociatedObject(video, "qd_tint_color");
+    // 与上次颜色几乎一样就跳过，避免玻璃反复重渲染
+    UIColor *prev = objc_getAssociatedObject(gFloatBar, "qd_tint_color");
     if (prev) {
         CGFloat pr = 0, pg = 0, pb = 0, pa = 0;
         [prev getRed:&pr green:&pg blue:&pb alpha:&pa];
         if (fabs(pr - rr) < 0.04 && fabs(pg - gg) < 0.04 && fabs(pb - bb) < 0.04) return;
     }
-    UIColor *next = [UIColor colorWithRed:rr green:gg blue:bb alpha:0.55];
-    objc_setAssociatedObject(video, "qd_tint_color", next, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    [UIView transitionWithView:wash duration:0.6 options:UIViewAnimationOptionTransitionCrossDissolve animations:^{
-        wash.backgroundColor = next;
-    } completion:nil];
+    // 提亮一点再上色：深色画面直接原样上色会让玻璃看着发黑
+    rr = 0.35 + rr * 0.65; gg = 0.35 + gg * 0.65; bb = 0.35 + bb * 0.65;
+    UIColor *next = [UIColor colorWithRed:rr green:gg blue:bb alpha:0.45];
+    objc_setAssociatedObject(gFloatBar, "qd_tint_color", next, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    @try {
+        if ([gFloatGlassEffect respondsToSelector:@selector(setTintColor:)]) {
+            [gFloatGlassEffect setValue:next forKey:@"tintColor"];
+        }
+    } @catch (__unused NSException *e) {
+    }
 }
 
 static void QDYTTAutoTintSweep(void) {
-    // 关了开关：把还挂着的洗色层清掉
+    // 关了开关：清掉旧版本可能还挂着的洗色层（5.0.1 起不再创建），玻璃回到无色
     if (!QDYTTAutoTintEnabled() || !QDYTTGlassEnabled()) {
+        QDYTTAutoTintReset();
         UIWindow *window = [DYYYUtils getActiveWindow];
         if (window) {
             NSMutableArray<UIView *> *q = [NSMutableArray arrayWithObject:window];
@@ -1236,6 +1244,7 @@ static void QDFloatTearDown(AWENormalModeTabBar *bar) {
         gFloatSignature = nil;
         gFloatLastItem = nil;
     }
+    gFloatGlassEffect = nil;
     if (bar) QDFloatSetContentVisible(bar, QDYTTBarButtons(bar), YES);
     gQDFloatActive = NO;
 }
@@ -1290,6 +1299,7 @@ static void QDFloatUpdate(AWENormalModeTabBar *bar) {
                     if ([gFloatBar respondsToSelector:@selector(setScrollEdgeAppearance:)]) {
                         gFloatBar.scrollEdgeAppearance = appearance;
                     }
+                    gFloatGlassEffect = effect;   // 变色采样给这块玻璃上色
                 }
             }
         } @catch (__unused NSException *e) {

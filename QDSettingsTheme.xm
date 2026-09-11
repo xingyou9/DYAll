@@ -43,24 +43,54 @@
 #pragma mark - 材质
 
 static UIVisualEffect *QDThemeGlassEffect(void) {
-    Class glassClass = NSClassFromString(@"UIGlassEffect");
-    if (glassClass) {
-        @try {
-            id effect = nil;
-            SEL styleSel = NSSelectorFromString(@"effectWithStyle:");
-            if ([glassClass respondsToSelector:styleSel]) {
-                effect = ((id (*)(id, SEL, NSInteger))objc_msgSend)((id)glassClass, styleSel, (NSInteger)0);
+    // 共享单例：每个设置页复用同一个 effect 实例，避免每次 push 都重建玻璃渲染管线
+    //（用户反馈「切回玻璃界面卡一下才显示」，effect 反复创建是原因之一）
+    static UIVisualEffect *shared = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        Class glassClass = NSClassFromString(@"UIGlassEffect");
+        if (glassClass) {
+            @try {
+                id effect = nil;
+                SEL styleSel = NSSelectorFromString(@"effectWithStyle:");
+                if ([glassClass respondsToSelector:styleSel]) {
+                    // Clear 档：与底栏玻璃一致，浅色下不再发灰发白
+                    NSInteger style = QDYTTGlassClearEnabled() ? 1 : 0;
+                    effect = ((id (*)(id, SEL, NSInteger))objc_msgSend)((id)glassClass, styleSel, style);
+                }
+                if (!effect) effect = [[glassClass alloc] init];
+                if (effect) {
+                    @try {
+                        if ([effect respondsToSelector:@selector(setTintColor:)]) {
+                            [effect setValue:[UIColor colorWithWhite:0 alpha:0.05] forKey:@"tintColor"];
+                        }
+                        if ([effect respondsToSelector:@selector(setInteractive:)]) {
+                            [effect setValue:@YES forKey:@"interactive"];
+                        }
+                    } @catch (__unused NSException *e) {
+                    }
+                    shared = effect;
+                }
+            } @catch (__unused NSException *e) {
             }
-            if (!effect) effect = [[glassClass alloc] init];
-            if (effect) return effect;
-        } @catch (__unused NSException *e) {
         }
-    }
-    return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
+        if (!shared) shared = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
+    });
+    return shared;
 }
 
 static UIColor *QDThemeAccent(void) {
     return [UIColor colorWithRed:0.15 green:0.65 blue:0.72 alpha:1];
+}
+
+/// 主页卡片底色：浅色模式下白字压在透亮玻璃上不可读（用户截图的「文字发虚」），
+/// 浅色时改用深色底衬白字；深色模式维持原来的白 13% 透明。
+static UIColor *QDHeroSurfaceColor(void) {
+    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark
+            ? [UIColor colorWithWhite:1 alpha:0.13]
+            : [UIColor colorWithRed:0.10 green:0.11 blue:0.16 alpha:0.90];
+    }];
 }
 
 static BOOL QDIsQingdouPage(UIViewController *vc) {
@@ -166,7 +196,7 @@ static NSInteger QDCountEnabled(void) {
     if (!b) return;
     [b setTitle:on ? @"流畅模式 · 开" : @"流畅模式" forState:UIControlStateNormal];
     b.backgroundColor = on ? [UIColor colorWithRed:0.11 green:0.72 blue:0.47 alpha:0.92]
-                           : [UIColor colorWithWhite:1 alpha:0.16];
+                           : QDHeroSurfaceColor();
 }
 
 #pragma mark 5.0 Quick Actions（真实动作）
@@ -513,7 +543,7 @@ static UIImage *QDLineIconNamed(NSString *kind) {
 static UIView *QDBuildStatusCard(UIViewController *owner) {
     UIView *card = [[UIView alloc] init];
     card.translatesAutoresizingMaskIntoConstraints = NO;
-    card.backgroundColor = [UIColor colorWithWhite:1 alpha:0.13];
+    card.backgroundColor = QDHeroSurfaceColor();
     card.layer.cornerRadius = DYYDRadiusCard();
     card.layer.masksToBounds = YES;
 
@@ -562,7 +592,7 @@ static UIView *QDBuildStatusCard(UIViewController *owner) {
         line.translatesAutoresizingMaskIntoConstraints = NO;
 
         UIImageView *icon = [[UIImageView alloc] initWithImage:QDLineIconNamed(row[0])];
-        icon.tintColor = UIColor.labelColor;
+        icon.tintColor = UIColor.whiteColor;   // 卡片是深色底，图标统一白线稿
         icon.contentMode = UIViewContentModeScaleAspectFit;
         icon.translatesAutoresizingMaskIntoConstraints = NO;
         [icon.widthAnchor constraintEqualToConstant:16].active = YES;
@@ -665,7 +695,7 @@ static UIButton *QDQuickButton(NSString *title) {
     [b setTitle:title forState:UIControlStateNormal];
     b.titleLabel.font = [UIFont systemFontOfSize:13.5 weight:UIFontWeightSemibold];
     [b setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
-    b.backgroundColor = [UIColor colorWithWhite:1 alpha:0.16];
+    b.backgroundColor = QDHeroSurfaceColor();
     b.layer.cornerRadius = 14;
     b.layer.masksToBounds = YES;
     return b;
@@ -690,7 +720,7 @@ static UIView *QDBuildHero(CGFloat width, UIViewController *owner, NSDictionary 
     search.attributedPlaceholder = [[NSAttributedString alloc]
         initWithString:@"搜索功能（下载 / 倍速 / 透明…）"
             attributes:@{ NSForegroundColorAttributeName : [UIColor colorWithWhite:1 alpha:0.55] }];
-    search.backgroundColor = [UIColor colorWithWhite:1 alpha:0.16];
+    search.backgroundColor = QDHeroSurfaceColor();
     search.layer.cornerRadius = 14;
     search.layer.masksToBounds = YES;
     UIView *lv = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 32, 18)];
@@ -862,7 +892,7 @@ static UIView *QDBuildHero(CGFloat width, UIViewController *owner, NSDictionary 
     recent.spacing = 5;
     UIView *recentCard = [[UIView alloc] init];
     recentCard.translatesAutoresizingMaskIntoConstraints = NO;
-    recentCard.backgroundColor = [UIColor colorWithWhite:1 alpha:0.10];
+    recentCard.backgroundColor = QDHeroSurfaceColor();
     recentCard.layer.cornerRadius = DYYDRadiusLarge();
     recentCard.layer.masksToBounds = YES;
     UILabel *recentHead = [[UILabel alloc] init];

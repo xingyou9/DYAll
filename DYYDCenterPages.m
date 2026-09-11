@@ -9,6 +9,25 @@
 
 #pragma mark - 通用
 
+// 与 DYYYSystemPages 的老页面同款：页面必须不透明。
+// 之前 tableView 背景是 clearColor，push 进抖音导航栈后透出下面的设置页，
+// 表现为「两个页面叠在一起」的渲染错乱。
+static UIColor *DYYDPageBackgroundColor(void) {
+    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark
+            ? [UIColor colorWithRed:0.07 green:0.07 blue:0.08 alpha:1]
+            : [UIColor colorWithRed:0.95 green:0.96 blue:0.97 alpha:1];
+    }];
+}
+
+static UIColor *DYYDCellBackgroundColor(void) {
+    return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark
+            ? [UIColor colorWithRed:0.13 green:0.13 blue:0.15 alpha:1]
+            : UIColor.whiteColor;
+    }];
+}
+
 static NSString *DYYDFormatBytes(unsigned long long bytes) {
     if (bytes >= 1024ULL * 1024ULL) return [NSString stringWithFormat:@"%.1f MB", bytes / (1024.0 * 1024.0)];
     if (bytes >= 1024ULL) return [NSString stringWithFormat:@"%.1f KB", bytes / 1024.0];
@@ -21,7 +40,7 @@ static UITableViewCell *DYYDDequeue(UITableView *tv) {
     if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:ident];
     cell.textLabel.font = DYYDFontBody();
     cell.detailTextLabel.font = DYYDFontMetric();
-    cell.backgroundColor = UIColor.clearColor;
+    cell.backgroundColor = DYYDCellBackgroundColor();
     return cell;
 }
 
@@ -101,9 +120,9 @@ static void DYYDToast(NSString *msg) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"性能中心";
+    self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeNever;
+    self.view.backgroundColor = DYYDPageBackgroundColor();
     self.tableView.separatorColor = DYYDColorSeparator();
-    self.tableView.backgroundColor = UIColor.clearColor;
-    self.tableView.backgroundView = nil;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(reloadDataSafe) name:DYYYPerfOptimizeNotification object:nil];
 }
 
