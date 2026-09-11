@@ -182,7 +182,7 @@ NSArray<NSDictionary<NSString *, id> *> *DYYYSettingsSearchIndex(void) {
             @{ @"id" : @"DYYYHideStickerView", @"title" : @"隐藏文字贴纸", @"sub" : @"隐藏主播设置的预约直播和文字贴纸", @"cell" : @37, @"cat" : @"隐藏设置" },
             @{ @"id" : @"DYYYHideGroupComponent", @"title" : @"隐藏礼物挑战", @"sub" : @"隐藏主播设置的发送礼物做挑战列表", @"cell" : @37, @"cat" : @"隐藏设置" },
             @{ @"id" : @"DYYYHideCellularAlert", @"title" : @"隐藏流量提醒", @"sub" : @"", @"cell" : @6, @"cat" : @"隐藏设置" },
-            @{ @"id" : @"DYYYSimplifyLongPressPanel", @"title" : @"精简长按面板", @"sub" : @"开启后将隐藏所有原始面板选项，只保留 DYYY 自定义功能", @"cell" : @37, @"cat" : @"隐藏设置" },
+            @{ @"id" : @"DYYYSimplifyLongPressPanel", @"title" : @"精简长按面板", @"sub" : @"开启后将隐藏所有原始面板选项，只保留 YTT 自定义功能", @"cell" : @37, @"cat" : @"隐藏设置" },
             @{ @"id" : @"DYYYHidePanelItems", @"title" : @"隐藏面板项目", @"sub" : @"输入要隐藏的按钮名称，多个用逗号分隔\\n支持精确匹配和部分匹配，不区分大小写\\n例如：举报,倍速,投屏,弹幕", @"cell" : @20, @"cat" : @"隐藏设置" },
             @{ @"id" : @"DYYYHideCommentShareToFriends", @"title" : @"隐藏评论分享", @"sub" : @"", @"cell" : @6, @"cat" : @"隐藏设置" },
             @{ @"id" : @"DYYYHideCommentLongPressCopy", @"title" : @"隐藏评论复制", @"sub" : @"", @"cell" : @6, @"cat" : @"隐藏设置" },
@@ -235,7 +235,7 @@ NSArray<NSDictionary<NSString *, id> *> *DYYYSettingsSearchIndex(void) {
             @{ @"id" : @"DYYYRemoteConfigURL", @"title" : @"远程配置地址", @"sub" : @"", @"cell" : @26, @"cat" : @"增强设置" },
             @{ @"id" : @"DYYYCheckUpdate", @"title" : @"检查配置更新", @"sub" : @"", @"cell" : @26, @"cat" : @"增强设置" },
             @{ @"id" : @"DYYYDisableSettingsGesture", @"title" : @"禁用双指长按入口", @"sub" : @"开启后将禁用双指长按弹出的设置入口，开启或者关闭此选项都需要重启抖音以生效", @"cell" : @37, @"cat" : @"增强设置" },
-            @{ @"id" : @"DYYYEntrance", @"title" : @"左侧边栏快捷入口", @"sub" : @"将侧边栏替换为 DYYY 快捷入口", @"cell" : @37, @"cat" : @"增强设置" },
+            @{ @"id" : @"DYYYEntrance", @"title" : @"左侧边栏快捷入口", @"sub" : @"将侧边栏替换为 YTT 快捷入口", @"cell" : @37, @"cat" : @"增强设置" },
             @{ @"id" : @"DYYYDisableSidebarGesture", @"title" : @"禁止侧滑进入边栏", @"sub" : @"禁止在首页最左边的页面时右滑进入侧边栏", @"cell" : @37, @"cat" : @"增强设置" },
             @{ @"id" : @"DYYYVideoGesture", @"title" : @"横屏视频交互增强", @"sub" : @"启用横屏视频的手势功能", @"cell" : @37, @"cat" : @"增强设置" },
             @{ @"id" : @"DYYYDisableAutoEnterLive", @"title" : @"禁用自动进入直播", @"sub" : @"禁止顶栏直播下自动进入直播间", @"cell" : @37, @"cat" : @"增强设置" },
@@ -273,7 +273,7 @@ NSArray<NSDictionary<NSString *, id> *> *DYYYSettingsSearchIndex(void) {
             @{ @"id" : @"DYYYHideSlider", @"title" : @"清屏隐藏滑条", @"sub" : @"清屏状态下隐藏多图片下方的滑条", @"cell" : @37, @"cat" : @"悬浮按钮" },
             @{ @"id" : @"DYYYHideChapter", @"title" : @"清屏隐藏章节", @"sub" : @"清屏状态下隐藏部分视频出现的章节进度显示", @"cell" : @37, @"cat" : @"悬浮按钮" },
             @{ @"id" : @"DYYYHideTabBar", @"title" : @"清屏隐藏底栏", @"sub" : @"", @"cell" : @6, @"cat" : @"悬浮按钮" },
-            @{ @"id" : @"DYYYHideSpeed", @"title" : @"清屏隐藏倍速", @"sub" : @"清屏状态下隐藏DYYY的倍速按钮", @"cell" : @37, @"cat" : @"悬浮按钮" },
+            @{ @"id" : @"DYYYHideSpeed", @"title" : @"清屏隐藏倍速", @"sub" : @"清屏状态下隐藏YTT的倍速按钮", @"cell" : @37, @"cat" : @"悬浮按钮" },
         ];
     });
     return index;

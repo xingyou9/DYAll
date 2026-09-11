@@ -52,7 +52,7 @@ typedef NS_ENUM(NSInteger, DYYYSettingItemType) { DYYYSettingItemTypeSwitch, DYY
 - (void)viewDidLoad {
     [super viewDidLoad];
 
-    self.title = @"DYYY设置";
+    self.title = @"YTT 设置";
     self.expandedSections = [NSMutableSet set];
     self.isAgreementShown = NO;
 

@@ -1680,7 +1680,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
           @{
               @"identifier" : @"DYYYSimplifyLongPressPanel",
               @"title" : @"精简长按面板",
-              @"subTitle" : @"开启后将隐藏所有原始面板选项，只保留 DYYY 自定义功能",
+              @"subTitle" : @"开启后将隐藏所有原始面板选项，只保留 YTT 自定义功能",
               @"detail" : @"",
               @"cellType" : @37,
               @"imageName" : @"ic_eyeslash_outlined_16"
@@ -2662,7 +2662,7 @@ void showDYYYSettingsVC(UIViewController *rootVC, BOOL hasAgreed) {
           @{
               @"identifier" : @"DYYYEntrance",
               @"title" : @"左侧边栏快捷入口",
-              @"subTitle" : @"将侧边栏替换为 DYYY 快捷入口",
+              @"subTitle" : @"将侧边栏替换为 YTT 快捷入口",
               @"detail" : @"",
               @"cellType" : @37,
               @"imageName" : @"ic_circlearrowin_outlined_20"
@@ -3179,7 +3179,7 @@ speedSettingsItem.detail = trimmedText;
       AWESettingItemModel *hideSpeedButton = [DYYYSettingsHelper createSettingItem:@{
           @"identifier" : @"DYYYHideSpeed",
           @"title" : @"清屏隐藏倍速",
-          @"subTitle" : @"清屏状态下隐藏DYYY的倍速按钮",
+          @"subTitle" : @"清屏状态下隐藏YTT的倍速按钮",
           @"detail" : @"",
           @"cellType" : @37,
           @"imageName" : @"ic_eyeslash_outlined_16"
@@ -3271,7 +3271,7 @@ speedSettingsItem.detail = trimmedText;
       NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
       [formatter setDateFormat:@"yyyyMMdd_HHmmss"];
       NSString *timestamp = [formatter stringFromDate:[NSDate date]];
-      NSString *backupFileName = [NSString stringWithFormat:@"DYYY_Backup_%@.json", timestamp];
+      NSString *backupFileName = [NSString stringWithFormat:@"YTT_Backup_%@.json", timestamp];
       NSString *tempFilePath = [DYYYUtils cachePathForFilename:backupFileName];
 
       BOOL success = [sortedJsonData writeToFile:tempFilePath atomically:YES];
@@ -3620,52 +3620,8 @@ speedSettingsItem.detail = trimmedText;
     categoryBlocks[@"顶栏移除"] = ^{ void (^jump)(void) = removeSettingItem.cellTappedBlock; if (jump) jump(); };
     categoryBlocks[@"增强设置"] = ^{ void (^jump)(void) = enhanceSettingItem.cellTappedBlock; if (jump) jump(); };
     categoryBlocks[@"悬浮按钮"] = ^{ void (^jump)(void) = floatButtonSettingItem.cellTappedBlock; if (jump) jump(); };
-
-    AWESettingItemModel *searchSettingItem = [[%c(AWESettingItemModel) alloc] init];
-    searchSettingItem.identifier = @"DYYYSettingsSearch";
-    searchSettingItem.title = @"🔎 搜索设置";
-    searchSettingItem.detail = [NSString stringWithFormat:@"%lu 项功能", (unsigned long)DYYYSettingsSearchIndex().count];
-    searchSettingItem.type = 0;
-    searchSettingItem.svgIconImageName = @"ic_search_outlined_20";
-    searchSettingItem.cellType = 26;
-    searchSettingItem.colorStyle = 0;
-    searchSettingItem.isEnable = YES;
-    searchSettingItem.cellTappedBlock = ^{
-      DYYYSettingsSearchViewController *page = [[DYYYSettingsSearchViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-      page.categoryBlocks = categoryBlocks;
-      [settingsVC.navigationController pushViewController:page animated:YES];
-    };
-    [mainItems addObject:searchSettingItem];
-
-    AWESettingItemModel *statusCenterItem = [[%c(AWESettingItemModel) alloc] init];
-    statusCenterItem.identifier = @"DYYYStatusCenter";
-    statusCenterItem.title = @"📊 状态中心";
-    statusCenterItem.detail = [DYYYHookManager problemCount] > 0 ? [NSString stringWithFormat:@"%lu 项异常", (unsigned long)[DYYYHookManager problemCount]] : @"全部正常";
-    statusCenterItem.type = 0;
-    statusCenterItem.svgIconImageName = @"ic_status_outlined_20";
-    statusCenterItem.cellType = 26;
-    statusCenterItem.colorStyle = 0;
-    statusCenterItem.isEnable = YES;
-    statusCenterItem.cellTappedBlock = ^{
-      UIViewController *page = [[DYYYStatusViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-      [settingsVC.navigationController pushViewController:page animated:YES];
-    };
-    [mainItems addObject:statusCenterItem];
-
-    AWESettingItemModel *taskCenterItem = [[%c(AWESettingItemModel) alloc] init];
-    taskCenterItem.identifier = @"DYYYTaskCenterEntry";
-    taskCenterItem.title = @"📦 任务中心";
-    taskCenterItem.detail = [[DYYYTaskCenter shared] activeTasks].count > 0 ? [NSString stringWithFormat:@"%lu 个进行中", (unsigned long)[[DYYYTaskCenter shared] activeTasks].count] : @"下载 / 转换任务";
-    taskCenterItem.type = 0;
-    taskCenterItem.svgIconImageName = @"ic_download_outlined_20";
-    taskCenterItem.cellType = 26;
-    taskCenterItem.colorStyle = 0;
-    taskCenterItem.isEnable = YES;
-    taskCenterItem.cellTappedBlock = ^{
-      UIViewController *page = [[DYYYTaskCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-      [settingsVC.navigationController pushViewController:page animated:YES];
-    };
-    [mainItems addObject:taskCenterItem];
+    // 给主界面内联搜索浮层用（QDSettingsTheme 通过关联对象取走）
+    objc_setAssociatedObject(settingsVC, "qd_category_blocks", [categoryBlocks copy], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
     AWESettingItemModel *logViewerItem = [[%c(AWESettingItemModel) alloc] init];
     logViewerItem.identifier = @"DYYYLogViewer";
@@ -3737,21 +3693,6 @@ speedSettingsItem.detail = trimmedText;
       [settingsVC.navigationController pushViewController:page animated:YES];
     };
 
-    AWESettingItemModel *dashboardFeaturesItem = [[%c(AWESettingItemModel) alloc] init];
-    dashboardFeaturesItem.identifier = @"DYYYDashboardFeatures";
-    dashboardFeaturesItem.title = @"🚀 已启用功能";
-    dashboardFeaturesItem.detail = [DYYYCompatibility dependencyCheckPassed] ? [NSString stringWithFormat:@"%lu 项", [DYYYDiagnostics enabledFeatureCount]] : [NSString stringWithFormat:@"%lu 项（依赖缺失）", [DYYYDiagnostics enabledFeatureCount]];
-    dashboardFeaturesItem.type = 0;
-    dashboardFeaturesItem.svgIconImageName = @"ic_magic_outlined_20";
-    dashboardFeaturesItem.cellType = 26;
-    dashboardFeaturesItem.colorStyle = 0;
-    dashboardFeaturesItem.isEnable = YES;
-    dashboardFeaturesItem.cellTappedBlock = ^{
-      DYYYSettingsSearchViewController *page = [[DYYYSettingsSearchViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-      page.categoryBlocks = categoryBlocks;
-      [settingsVC.navigationController pushViewController:page animated:YES];
-    };
-
     AWESettingItemModel *dashboardTasksItem = [[%c(AWESettingItemModel) alloc] init];
     dashboardTasksItem.identifier = @"DYYYDashboardTasks";
     dashboardTasksItem.title = @"📥 下载任务";
@@ -3766,21 +3707,8 @@ speedSettingsItem.detail = trimmedText;
       [settingsVC.navigationController pushViewController:page animated:YES];
     };
 
-    AWESettingItemModel *dashboardHookItem = [[%c(AWESettingItemModel) alloc] init];
-    dashboardHookItem.identifier = @"DYYYDashboardHooks";
-    dashboardHookItem.title = @"🛡️ Hook 状态";
-    dashboardHookItem.detail = [DYYYHookManager summaryText];
-    dashboardHookItem.type = 0;
-    dashboardHookItem.svgIconImageName = @"ic_shield_outlined_20";
-    dashboardHookItem.cellType = 26;
-    dashboardHookItem.colorStyle = 0;
-    dashboardHookItem.isEnable = YES;
-    dashboardHookItem.cellTappedBlock = ^{
-      UIViewController *page = [[DYYYStatusViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-      [settingsVC.navigationController pushViewController:page animated:YES];
-    };
-
-    dashboardSection.itemArray = @[ dashboardHeaderItem, dashboardFeaturesItem, dashboardTasksItem, dashboardHookItem ];
+    // Hook 状态 / 已启用功能两个入口已删：与状态大框、内联搜索重复
+    dashboardSection.itemArray = @[ dashboardHeaderItem, dashboardTasksItem ];
 
     viewModel.sectionDataArray = @[ dashboardSection, yttSection, mainSection, cleanupSection, backupSection, aboutSection ];
     objc_setAssociatedObject(settingsVC, &kViewModelKey, viewModel, OBJC_ASSOCIATION_RETAIN_NONATOMIC);

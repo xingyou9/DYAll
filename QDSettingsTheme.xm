@@ -22,6 +22,12 @@
 #import "AwemeHeaders.h"
 #import "DYYYConstants.h"
 #import "DYYYSettingsHelper.h"
+#import "DYYYSettingsIndex.h"
+#import "DYYYSystemPages.h"
+#import "DYYYHookManager.h"
+#import "DYYYSafetyGuard.h"
+#import "DYYYTaskCenter.h"
+#import "DYYYDiagnostics.h"
 #import "DYYYUtils.h"
 #import "QDGlassTabBar.h"
 #import "QDExtra.h"
@@ -159,7 +165,289 @@ static NSInteger QDCountEnabled(void) {
 
 @end
 
-#pragma mark - Hero
+#pragma mark - 主界面搜索（内联浮层，替代独立搜索页）
+
+@interface QDHeroSearch : NSObject <UITextFieldDelegate, UITableViewDelegate, UITableViewDataSource>
+@property (nonatomic, weak) UIViewController *owner;
+@property (nonatomic, weak) UITextField *field;
+@property (nonatomic, strong) UIView *panel;
+@property (nonatomic, strong) UITableView *table;
+@property (nonatomic, strong) NSArray<NSDictionary<NSString *, id> *> *results;
+@property (nonatomic, copy) NSString *query;
+@property (nonatomic, copy) NSDictionary<NSString *, void (^)(void)> *categoryBlocks;
+- (void)applyQuery:(NSString *)text;
+- (void)hidePanel;
+@end
+
+static QDHeroSearch *gQDHeroSearch = nil;
+
+@implementation QDHeroSearch
+
+- (void)attachTo:(UIViewController *)owner field:(UITextField *)field {
+    self.owner = owner;
+    self.field = field;
+    self.results = DYYYSettingsSearchIndex();
+    self.query = @"";
+
+    [self.panel removeFromSuperview];   // 换设置页实例时避免浮层堆积
+
+    UIView *panel = [[UIView alloc] initWithFrame:CGRectZero];
+    panel.layer.cornerRadius = 16;
+    panel.layer.masksToBounds = YES;
+    panel.backgroundColor = [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *t) {
+        return t.userInterfaceStyle == UIUserInterfaceStyleDark
+            ? [UIColor colorWithRed:0.16 green:0.16 blue:0.18 alpha:1]
+            : UIColor.whiteColor;
+    }];
+    panel.layer.shadowColor = UIColor.blackColor.CGColor;
+    panel.layer.shadowOpacity = 0.25;
+    panel.layer.shadowRadius = 12;
+    panel.layer.shadowOffset = CGSizeMake(0, 4);
+    panel.hidden = YES;
+
+    UITableView *table = [[UITableView alloc] initWithFrame:CGRectZero style:UITableViewStylePlain];
+    table.dataSource = self;
+    table.delegate = self;
+    table.backgroundColor = UIColor.clearColor;
+    table.separatorInset = UIEdgeInsetsMake(0, 16, 0, 16);
+    table.layer.cornerRadius = 16;
+    table.clipsToBounds = YES;
+    [panel addSubview:table];
+    self.table = table;
+    self.panel = panel;
+    [owner.view addSubview:panel];
+}
+
+- (void)applyQuery:(NSString *)text {
+    text = [text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    self.query = text;
+    if (text.length == 0) {
+        [self hidePanel];
+        return;
+    }
+    NSPredicate *predicate = [NSPredicate predicateWithFormat:
+        @"title CONTAINS[cd] %@ OR sub CONTAINS[cd] %@ OR id CONTAINS[cd] %@ OR cat CONTAINS[cd] %@",
+        text, text, text, text];
+    self.results = [DYYYSettingsSearchIndex() filteredArrayUsingPredicate:predicate];
+    [self reposition];
+    [self.table reloadData];
+    self.panel.hidden = NO;
+}
+
+- (void)hidePanel {
+    self.panel.hidden = YES;
+    self.query = @"";
+}
+
+- (void)reposition {
+    UIViewController *owner = self.owner;
+    UITextField *field = self.field;
+    if (!owner || !field) return;
+    CGRect fieldRect = [field convertRect:field.bounds toView:owner.view];
+    CGFloat top = CGRectGetMaxY(fieldRect) + 6;
+    CGFloat width = CGRectGetWidth(fieldRect);
+    CGFloat height = MIN((CGFloat)self.results.count, 6.0) * 50.0 + 10.0;
+    if (self.results.count == 0) height = 54.0;
+    height = MIN(height, owner.view.bounds.size.height - top - 16.0);
+    self.panel.frame = CGRectMake(CGRectGetMinX(fieldRect), top, width, height);
+    self.table.frame = self.panel.bounds;
+}
+
+#pragma mark 表格
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    return self.results.count;
+}
+
+- (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    return 50.0;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    static NSString *identifier = @"QDHeroSearchCell";
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:identifier];
+    if (!cell) cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:identifier];
+    cell.backgroundColor = UIColor.clearColor;
+    cell.textLabel.font = [UIFont systemFontOfSize:14.5 weight:UIFontWeightMedium];
+    cell.detailTextLabel.font = [UIFont systemFontOfSize:11.5];
+    cell.detailTextLabel.textColor = UIColor.secondaryLabelColor;
+    cell.accessoryView = nil;
+    cell.accessoryType = UITableViewCellAccessoryNone;
+
+    NSDictionary<NSString *, id> *entry = self.results[indexPath.row];
+    cell.textLabel.text = entry[@"title"];
+    cell.detailTextLabel.text = [NSString stringWithFormat:@"%@", entry[@"cat"]];
+
+    // 开关类设置（cellType 37）直接在浮层里给开关
+    if ([entry[@"cell"] isKindOfClass:[NSNumber class]] && [entry[@"cell"] integerValue] == 37) {
+        NSString *key = entry[@"id"];
+        UISwitch *toggle = [[UISwitch alloc] initWithFrame:CGRectZero];
+        toggle.transform = CGAffineTransformMakeScale(0.82, 0.82);
+        toggle.on = [[NSUserDefaults standardUserDefaults] boolForKey:key];
+        toggle.onTintColor = [UIColor colorWithRed:0.15 green:0.65 blue:0.72 alpha:1];
+        [toggle addTarget:self action:@selector(toggleChanged:) forControlEvents:UIControlEventValueChanged];
+        objc_setAssociatedObject(toggle, "qd_hero_search_key", key, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        cell.accessoryView = toggle;
+    } else {
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+    }
+    return cell;
+}
+
+- (void)toggleChanged:(UISwitch *)sender {
+    NSString *key = objc_getAssociatedObject(sender, "qd_hero_search_key");
+    if (key.length == 0) return;
+    [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:key];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    [DYYYSettingsHelper handleConflictsAndDependenciesForSetting:key isEnabled:sender.isOn];
+    [DYYYUtils showToast:[NSString stringWithFormat:@"已%@「%@」", sender.isOn ? @"开启" : @"关闭", key]];
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    NSDictionary<NSString *, id> *entry = self.results[indexPath.row];
+    if ([entry[@"cell"] isKindOfClass:[NSNumber class]] && [entry[@"cell"] integerValue] == 37) return;
+    [self hidePanel];
+    [self.field resignFirstResponder];
+    void (^jumpBlock)(void) = self.categoryBlocks[entry[@"cat"]];
+    if (jumpBlock) {
+        jumpBlock();
+        [DYYYUtils showToast:[NSString stringWithFormat:@"已进入「%@」，请查找「%@」", entry[@"cat"], entry[@"title"]]];
+    } else {
+        [DYYYUtils showToast:[NSString stringWithFormat:@"「%@」位于「%@」分类", entry[@"title"], entry[@"cat"]]];
+    }
+}
+
+#pragma mark 输入框 / 交互
+
+- (void)fieldEdited:(UITextField *)sender {
+    [self applyQuery:sender.text];
+}
+
+- (void)backgroundTapped:(UITapGestureRecognizer *)gr {
+    if (self.panel.hidden || !self.owner) return;
+    // 点在浮层或搜索框内部不收起，避免打断开关操作
+    CGPoint p = [gr locationInView:self.owner.view];
+    CGRect fieldRect = [self.field convertRect:self.field.bounds toView:self.owner.view];
+    if (CGRectContainsPoint(self.panel.frame, p) || CGRectContainsPoint(fieldRect, p)) return;
+    [self hidePanel];
+    [self.field resignFirstResponder];
+}
+
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
+    [textField resignFirstResponder];
+    return YES;
+}
+
+@end
+
+#pragma mark - 状态大框（主界面直接看状态，不用点进状态中心）
+
+@interface QDHeroStatusTap : NSObject
+@property (nonatomic, weak) UIViewController *host;
+- (void)openStatusCenter;
+@end
+@implementation QDHeroStatusTap
+- (void)openStatusCenter {
+    UIViewController *host = self.host;
+    if (host && host.navigationController) {
+        UIViewController *page = [[DYYYStatusViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+        [host.navigationController pushViewController:page animated:YES];
+    }
+}
+@end
+
+static QDHeroStatusTap *gQDStatusTap = nil;
+
+static UIView *QDBuildStatusCard(UIViewController *owner) {
+    UIView *card = [[UIView alloc] init];
+    card.translatesAutoresizingMaskIntoConstraints = NO;
+    card.backgroundColor = [UIColor colorWithWhite:1 alpha:0.13];
+    card.layer.cornerRadius = 18;
+    card.layer.masksToBounds = YES;
+    [card.heightAnchor constraintEqualToConstant:196].active = YES;
+
+    UILabel *head = [[UILabel alloc] init];
+    head.translatesAutoresizingMaskIntoConstraints = NO;
+    head.text = [DYYYSafetyGuard isSafeMode] ? @"⚠️ 安全模式运行中" : @"● 全部模块正常";
+    head.font = [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
+    head.textColor = [DYYYSafetyGuard isSafeMode] ? [UIColor colorWithRed:1 green:0.76 blue:0.33 alpha:1]
+                                                  : [UIColor colorWithRed:0.35 green:0.95 blue:0.6 alpha:1];
+
+    NSDictionary<NSString *, NSString *> *env = [DYYYCompatibility environmentInfo];
+    NSString *hooks = [NSString stringWithFormat:@"%lu 项", (unsigned long)[DYYYHookManager allRecords].count];
+    NSUInteger problem = [DYYYHookManager problemCount];
+    if (problem > 0) hooks = [NSString stringWithFormat:@"%@（⚠️ 异常 %lu）", hooks, (unsigned long)problem];
+
+    NSArray<NSArray<NSString *> *> *rows = @[
+        @[ @"🛡️", @"Hook 状态", hooks ],
+        @[ @"🚀", @"已启用功能", [NSString stringWithFormat:@"%ld 项", (long)[DYYYDiagnostics enabledFeatureCount]] ],
+        @[ @"🧊", @"玻璃引擎", QDYTTGlassEngineName() ],
+        @[ @"📱", @"系统 / 抖音", [NSString stringWithFormat:@"iOS %@ · 抖音 %@",
+            env[@"iOS 版本"] ?: @"?", env[@"抖音版本"] ?: @"?"] ],
+        @[ @"📦", @"下载任务", [NSString stringWithFormat:@"今日完成 %lu · 运行中 %lu",
+            (unsigned long)[[DYYYTaskCenter shared] finishedCountToday],
+            (unsigned long)[[DYYYTaskCenter shared] activeTasks].count] ],
+    ];
+
+    UIStackView *vstack = [[UIStackView alloc] init];
+    vstack.translatesAutoresizingMaskIntoConstraints = NO;
+    vstack.axis = UILayoutConstraintAxisVertical;
+    vstack.spacing = 9;
+
+    for (NSArray<NSString *> *row in rows) {
+        UIStackView *line = [[UIStackView alloc] init];
+        line.axis = UILayoutConstraintAxisHorizontal;
+        line.spacing = 7;
+        line.alignment = UIStackViewAlignmentCenter;
+        line.translatesAutoresizingMaskIntoConstraints = NO;
+
+        UILabel *icon = [[UILabel alloc] init];
+        icon.text = row[0];
+        icon.font = [UIFont systemFontOfSize:12.5];
+        [icon.widthAnchor constraintEqualToConstant:20].active = YES;
+
+        UILabel *key = [[UILabel alloc] init];
+        key.text = row[1];
+        key.font = [UIFont systemFontOfSize:12.5 weight:UIFontWeightRegular];
+        key.textColor = [UIColor colorWithWhite:1 alpha:0.72];
+        [key setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+
+        UILabel *value = [[UILabel alloc] init];
+        value.text = row[2];
+        value.font = [UIFont monospacedDigitSystemFontOfSize:12.5 weight:UIFontWeightMedium];
+        value.textColor = UIColor.whiteColor;
+        value.textAlignment = NSTextAlignmentRight;
+        value.lineBreakMode = NSLineBreakByTruncatingMiddle;
+        value.adjustsFontSizeToFitWidth = YES;
+        value.minimumScaleFactor = 0.8;
+        [value setContentHuggingPriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
+
+        [line addArrangedSubview:icon];
+        [line addArrangedSubview:key];
+        [line addArrangedSubview:value];
+        [vstack addArrangedSubview:line];
+    }
+
+    [card addSubview:head];
+    [card addSubview:vstack];
+    [NSLayoutConstraint activateConstraints:@[
+        [head.topAnchor constraintEqualToAnchor:card.topAnchor constant:13],
+        [head.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16],
+        [vstack.topAnchor constraintEqualToAnchor:head.bottomAnchor constant:9],
+        [vstack.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:16],
+        [vstack.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-16],
+    ]];
+
+    // 点大框直接进状态中心
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{ gQDStatusTap = [[QDHeroStatusTap alloc] init]; });
+    gQDStatusTap.host = owner;
+    card.userInteractionEnabled = YES;
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:gQDStatusTap action:@selector(openStatusCenter)];
+    [card addGestureRecognizer:tap];
+    return card;
+}
 
 static UILabel *QDChip(NSString *value, NSString *label) {
     UILabel *l = [[UILabel alloc] init];
@@ -218,8 +506,8 @@ static UIButton *QDQuickButton(NSString *title) {
     return b;
 }
 
-static UIView *QDBuildHero(CGFloat width, UIViewController *owner) {
-    UIView *root = [[UIView alloc] initWithFrame:CGRectMake(0, 0, width, 306)];
+static UIView *QDBuildHero(CGFloat width, UIViewController *owner, NSDictionary *categoryBlocks) {
+    UIView *root = [[UIView alloc] initWithFrame:CGRectMake(0, 0, width, 564)];
     root.backgroundColor = [UIColor clearColor];
 
     UIStackView *vstack = [[UIStackView alloc] init];
@@ -228,6 +516,41 @@ static UIView *QDBuildHero(CGFloat width, UIViewController *owner) {
     vstack.spacing = 10;
     vstack.alignment = UIStackViewAlignmentFill;
     [root addSubview:vstack];
+
+    // ——— 内联搜索框（放在「增强套件」文字上方，直接在主页搜全部功能） ———
+    UITextField *search = [[UITextField alloc] init];
+    search.translatesAutoresizingMaskIntoConstraints = NO;
+    search.font = [UIFont systemFontOfSize:14];
+    search.textColor = UIColor.whiteColor;
+    search.attributedPlaceholder = [[NSAttributedString alloc]
+        initWithString:@"🔍 搜索功能（下载 / 倍速 / 透明…）"
+            attributes:@{ NSForegroundColorAttributeName : [UIColor colorWithWhite:1 alpha:0.55] }];
+    search.backgroundColor = [UIColor colorWithWhite:1 alpha:0.16];
+    search.layer.cornerRadius = 14;
+    search.layer.masksToBounds = YES;
+    search.leftView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 14, 1)];
+    search.leftViewMode = UITextFieldViewModeAlways;
+    search.clearButtonMode = UITextFieldViewModeWhileEditing;
+    search.returnKeyType = UIReturnKeySearch;
+    search.autocorrectionType = UITextAutocorrectionTypeNo;
+    [search.heightAnchor constraintEqualToConstant:44].active = YES;
+
+    static dispatch_once_t searchOnce;
+    dispatch_once(&searchOnce, ^{ gQDHeroSearch = [[QDHeroSearch alloc] init]; });
+    gQDHeroSearch.owner = owner;
+    gQDHeroSearch.categoryBlocks = categoryBlocks ?: @{};
+    [gQDHeroSearch attachTo:owner field:search];
+    search.delegate = gQDHeroSearch;
+    [search addTarget:gQDHeroSearch action:@selector(fieldEdited:) forControlEvents:UIControlEventEditingChanged];
+
+    // 每个设置页实例都要绑一次「点外部收起」；用关联对象防止同一实例重复绑
+    if (!objc_getAssociatedObject(owner.view, "qd_hero_bgtap")) {
+        objc_setAssociatedObject(owner.view, "qd_hero_bgtap", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        UITapGestureRecognizer *bgTap = [[UITapGestureRecognizer alloc]
+            initWithTarget:gQDHeroSearch action:@selector(backgroundTapped:)];
+        bgTap.cancelsTouchesInView = NO;
+        [owner.view addGestureRecognizer:bgTap];
+    }
 
     // ——— 品牌大卡 ———
     QDGradientCardView *card = [[QDGradientCardView alloc] init];
@@ -289,7 +612,7 @@ static UIView *QDBuildHero(CGFloat width, UIViewController *owner) {
     title.textColor = UIColor.whiteColor;
 
     UILabel *sub = [[UILabel alloc] init];
-    sub.text = @"抖音增强套件 · 完全适配 iOS 26/27";
+    sub.text = @"元抖增强套件 · 完全适配 iOS 26/27";
     sub.font = [UIFont systemFontOfSize:11.5 weight:UIFontWeightRegular];
     sub.textColor = [UIColor colorWithWhite:1 alpha:0.75];
 
@@ -367,7 +690,9 @@ static UIView *QDBuildHero(CGFloat width, UIViewController *owner) {
     tip.textColor = UIColor.secondaryLabelColor;
     tip.textAlignment = NSTextAlignmentCenter;
 
+    [vstack addArrangedSubview:search];
     [vstack addArrangedSubview:card];
+    [vstack addArrangedSubview:QDBuildStatusCard(owner)];
     [vstack addArrangedSubview:quick];
     [vstack addArrangedSubview:tip];
 
@@ -439,7 +764,8 @@ static void QDThemeInstall(UIViewController *self) {
     if (pageTitle.length == 0) pageTitle = self.title;
     if (pageTitle.length == 0) pageTitle = @"";
     if (isRoot) {
-        tv.tableHeaderView = QDBuildHero(w, self);
+        NSDictionary *blocks = objc_getAssociatedObject(self, "qd_category_blocks");
+        tv.tableHeaderView = QDBuildHero(w, self, blocks);
     } else {
         tv.tableHeaderView = QDBuildSubHeader(w, pageTitle, @"元抖 · 抖音增强套件");
     }

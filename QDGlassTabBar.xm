@@ -52,7 +52,7 @@ void QDYTTGlassRegisterDefaults(void) {
     dispatch_once(&once, ^{
         [[NSUserDefaults standardUserDefaults] registerDefaults:@{
             kQDYTTKeyGlass    : @YES,   // 主开关默认开：装上就该看得见
-            kQDYTTKeyClear    : @NO,    // Clear 档更通透，但浅色页面对比度会掉，默认关
+            kQDYTTKeyClear    : @YES,   // Clear 档透亮玻璃：黑底上不再发灰白（用户明确要透亮）
             kQDYTTKeyGradient : @YES,   // 摘掉压暗玻璃的渐变，是玻璃观感的一部分
             kQDYTTKeyCapsule  : @NO,    // 仅引擎 B 的装饰胶囊，默认关
             kQDYTTKeyExtend   : @YES,   // 视频透出底栏：底栏后面是画面而不是黑块（用户明确要的）
@@ -618,6 +618,14 @@ static NSInteger QDYTTWorkScore(UIView *view, CGRect windowBounds) {
         || QDYTTNameContains(view, @"Table")) return -70;
     if ([view isKindOfClass:[UIVisualEffectView class]]) return -40;
 
+    // 硬门槛：只有真正的视频画面允许被拉伸。文案/评论区/整个作品容器绝不能拉伸——
+    // 拉了它们，文案就会跟着画面一起沉到悬浮底栏下面，表现为「文字跟底栏重合」。
+    BOOL isVideoSurface = QDYTTNameContains(view, @"Video") || QDYTTNameContains(view, @"Player");
+    if (!isVideoSurface) return -1;
+    if (QDYTTNameContains(view, @"Caption") || QDYTTNameContains(view, @"Description")
+        || QDYTTNameContains(view, @"Container") || QDYTTNameContains(view, @"Cell")
+        || QDYTTNameContains(view, @"Detail") || QDYTTNameContains(view, @"Text")) return -1;
+
     CGRect r = [view convertRect:view.bounds toView:nil];
     if (r.size.width < windowBounds.size.width * 0.6) return -1;
     if (r.size.height < windowBounds.size.height * 0.3) return -1;
@@ -721,18 +729,169 @@ static NSString *QDFloatFallbackTitle(NSInteger kind) {
     }
 }
 
-// SF Symbols 跟系统玻璃胶囊是一个设计语言：选中 filled，未选中 outlined，
-// 颜色交给 UITabBar 的 tintColor 体系自动适配深浅色。
+// 自绘简约矢量图标：替换 SF Symbols（用户嫌系统图标不好看）。
+// 24pt 网格手绘贝塞尔路径，模板渲染由 UITabBar 自动上色；
+// 未选中线性描边，选中填充。带缓存：绝对不能每次 tick 都生成新图，
+// 否则 selectedImage 反复被替换，返回页面时肉眼可见「卡顿刷新」。
+static UIImage *QDFloatIconCached(NSInteger kind, BOOL selected) {
+    static NSMutableDictionary *cache = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ cache = [NSMutableDictionary dictionary]; });
+    NSString *key = [NSString stringWithFormat:@"%ld|%d", (long)kind, selected ? 1 : 0];
+    UIImage *cached = cache[key];
+    if (cached) return cached;
+
+    UIGraphicsImageRendererFormat *fmt = [[UIGraphicsImageRendererFormat alloc] init];
+    fmt.scale = [UIScreen mainScreen].scale;
+    UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(24, 24) format:fmt];
+    UIImage *img = [renderer imageWithActions:^(UIGraphicsImageRendererContext *ctx) {
+        // 模板渲染只取 alpha 通道，颜色随意
+        UIColor *ink = UIColor.blackColor;
+        CGFloat lw = 1.9;
+        CGFloat r = 1.15;   // 圆点/圆头半径
+
+        void (^strokePath)(UIBezierPath *) = ^(UIBezierPath *p) {
+            p.lineWidth = lw;
+            p.lineCapStyle = kCGLineCapRound;
+            p.lineJoinStyle = kCGLineJoinRound;
+            [ink setStroke];
+            [p stroke];
+        };
+
+        if (kind == 0) {
+            // —— 首页：小房子 ——
+            if (selected) {
+                UIBezierPath *p = [UIBezierPath bezierPath];
+                [p moveToPoint:CGPointMake(3, 11.6)];
+                [p addLineToPoint:CGPointMake(12, 3.6)];
+                [p addLineToPoint:CGPointMake(21, 11.6)];
+                [p addLineToPoint:CGPointMake(19, 11.6)];
+                [p addLineToPoint:CGPointMake(19, 20)];
+                [p addLineToPoint:CGPointMake(5, 20)];
+                [p addLineToPoint:CGPointMake(5, 11.6)];
+                [p closePath];
+                UIBezierPath *door = [UIBezierPath bezierPathWithRect:CGRectMake(10.2, 14.2, 3.6, 5.8)];
+                [p appendPath:door];
+                p.usesEvenOddFillRule = YES;
+                [ink setFill];
+                [p fill];
+            } else {
+                UIBezierPath *roof = [UIBezierPath bezierPath];
+                [roof moveToPoint:CGPointMake(3, 11.6)];
+                [roof addLineToPoint:CGPointMake(12, 3.6)];
+                [roof addLineToPoint:CGPointMake(21, 11.6)];
+                strokePath(roof);
+                UIBezierPath *body = [UIBezierPath bezierPath];
+                [body moveToPoint:CGPointMake(5.2, 10.2)];
+                [body addLineToPoint:CGPointMake(5.2, 20)];
+                [body addLineToPoint:CGPointMake(18.8, 20)];
+                [body addLineToPoint:CGPointMake(18.8, 10.2)];
+                strokePath(body);
+                UIBezierPath *door = [UIBezierPath bezierPath];
+                [door moveToPoint:CGPointMake(10.2, 20)];
+                [door addLineToPoint:CGPointMake(10.2, 14.4)];
+                [door addLineToPoint:CGPointMake(13.8, 14.4)];
+                [door addLineToPoint:CGPointMake(13.8, 20)];
+                strokePath(door);
+            }
+        } else if (kind == 1) {
+            // —— 朋友：两个人 ——
+            if (selected) {
+                UIBezierPath *p = [UIBezierPath bezierPath];
+                [p appendPath:[UIBezierPath bezierPathWithArcCenter:CGPointMake(9.6, 7.6) radius:3.1 startAngle:0 endAngle:M_PI * 2 clockwise:YES]];
+                [p appendPath:[UIBezierPath bezierPathWithArcCenter:CGPointMake(16.6, 7.2) radius:2.5 startAngle:0 endAngle:M_PI * 2 clockwise:YES]];
+                UIBezierPath *front = [UIBezierPath bezierPath];
+                [front moveToPoint:CGPointMake(3.4, 20)];
+                [front addCurveToPoint:CGPointMake(15.8, 20) controlPoint1:CGPointMake(3.4, 14.2) controlPoint2:CGPointMake(6.4, 12.4)];
+                [p appendPath:front];
+                UIBezierPath *back = [UIBezierPath bezierPath];
+                [back moveToPoint:CGPointMake(17.4, 12.6)];
+                [back addCurveToPoint:CGPointMake(20.6, 20) controlPoint1:CGPointMake(19.6, 13.4) controlPoint2:CGPointMake(20.6, 16.2)];
+                [back addLineToPoint:CGPointMake(17.4, 20)];
+                [p appendPath:back];
+                [ink setFill];
+                [p fill];
+            } else {
+                UIBezierPath *head = [UIBezierPath bezierPathWithArcCenter:CGPointMake(9.6, 7.6) radius:3.1 startAngle:0 endAngle:M_PI * 2 clockwise:YES];
+                strokePath(head);
+                UIBezierPath *head2 = [UIBezierPath bezierPathWithArcCenter:CGPointMake(16.6, 7.2) radius:2.5 startAngle:0 endAngle:M_PI * 2 clockwise:YES];
+                strokePath(head2);
+                UIBezierPath *front = [UIBezierPath bezierPath];
+                [front moveToPoint:CGPointMake(3.4, 20)];
+                [front addCurveToPoint:CGPointMake(15.8, 20) controlPoint1:CGPointMake(3.4, 14.2) controlPoint2:CGPointMake(6.4, 12.4)];
+                strokePath(front);
+                UIBezierPath *back = [UIBezierPath bezierPath];
+                [back moveToPoint:CGPointMake(16.6, 12.2)];
+                [back addCurveToPoint:CGPointMake(20.6, 20) controlPoint1:CGPointMake(19.4, 12.8) controlPoint2:CGPointMake(20.6, 15.6)];
+                strokePath(back);
+            }
+        } else if (kind == 2) {
+            // —— 消息：对话气泡 + 三个点 ——
+            if (selected) {
+                UIBezierPath *p = [UIBezierPath bezierPath];
+                [p appendPath:[UIBezierPath bezierPathWithRoundedRect:CGRectMake(3, 4, 18, 13.4) cornerRadius:5.4]];
+                UIBezierPath *tail = [UIBezierPath bezierPath];
+                [tail moveToPoint:CGPointMake(8.6, 17.2)];
+                [tail addLineToPoint:CGPointMake(8.6, 21)];
+                [tail addLineToPoint:CGPointMake(13.2, 17.2)];
+                [p appendPath:tail];
+                for (NSValue *v in @[ [NSValue valueWithCGPoint:CGPointMake(8.4, 10.7)],
+                                      [NSValue valueWithCGPoint:CGPointMake(12, 10.7)],
+                                      [NSValue valueWithCGPoint:CGPointMake(15.6, 10.7)] ]) {
+                    CGPoint c = v.CGPointValue;
+                    UIBezierPath *dot = [UIBezierPath bezierPathWithArcCenter:c radius:r startAngle:0 endAngle:M_PI * 2 clockwise:YES];
+                    [p appendPath:dot];
+                }
+                p.usesEvenOddFillRule = YES;   // 三个点从实心气泡里镂空出来
+                [ink setFill];
+                [p fill];
+            } else {
+                UIBezierPath *bubble = [UIBezierPath bezierPathWithRoundedRect:CGRectMake(3, 4, 18, 13.4) cornerRadius:5.4];
+                strokePath(bubble);
+                UIBezierPath *tail = [UIBezierPath bezierPath];
+                [tail moveToPoint:CGPointMake(8.6, 17.4)];
+                [tail addLineToPoint:CGPointMake(8.6, 21)];
+                [tail addLineToPoint:CGPointMake(13.2, 17.4)];
+                strokePath(tail);
+                [ink setFill];
+                for (NSValue *v in @[ [NSValue valueWithCGPoint:CGPointMake(8.4, 10.7)],
+                                      [NSValue valueWithCGPoint:CGPointMake(12, 10.7)],
+                                      [NSValue valueWithCGPoint:CGPointMake(15.6, 10.7)] ]) {
+                    CGPoint c = v.CGPointValue;
+                    UIBezierPath *dot = [UIBezierPath bezierPathWithArcCenter:c radius:r startAngle:0 endAngle:M_PI * 2 clockwise:YES];
+                    [dot fill];
+                }
+            }
+        } else if (kind == 3) {
+            // —— 我：一个人 ——
+            if (selected) {
+                UIBezierPath *p = [UIBezierPath bezierPath];
+                [p appendPath:[UIBezierPath bezierPathWithArcCenter:CGPointMake(12, 7.4) radius:3.7 startAngle:0 endAngle:M_PI * 2 clockwise:YES]];
+                UIBezierPath *shoulders = [UIBezierPath bezierPath];
+                [shoulders moveToPoint:CGPointMake(4.8, 20.4)];
+                [shoulders addCurveToPoint:CGPointMake(19.2, 20.4) controlPoint1:CGPointMake(4.8, 13.8) controlPoint2:CGPointMake(8.2, 12.2)];
+                [p appendPath:shoulders];
+                [ink setFill];
+                [p fill];
+            } else {
+                UIBezierPath *head = [UIBezierPath bezierPathWithArcCenter:CGPointMake(12, 7.4) radius:3.7 startAngle:0 endAngle:M_PI * 2 clockwise:YES];
+                strokePath(head);
+                UIBezierPath *shoulders = [UIBezierPath bezierPath];
+                [shoulders moveToPoint:CGPointMake(4.8, 20.4)];
+                [shoulders addCurveToPoint:CGPointMake(19.2, 20.4) controlPoint1:CGPointMake(4.8, 13.8) controlPoint2:CGPointMake(8.2, 12.2)];
+                strokePath(shoulders);
+            }
+        }
+    }];
+    img.renderingMode = UIImageRenderingModeAlwaysTemplate;
+    cache[key] = img;
+    return img;
+}
+
+// SF Symbols 已被自绘图标替换（QDFloatIconCached）。保留拍摄用的系统加号。
 static UIImage *QDFloatIcon(NSInteger kind, BOOL selected) {
-    NSString *name = nil;
-    switch (kind) {
-        case 0: name = selected ? @"house.fill" : @"house"; break;
-        case 1: name = selected ? @"person.2.fill" : @"person.2"; break;
-        case 2: name = selected ? @"message.fill" : @"message"; break;
-        case 3: name = selected ? @"person.fill" : @"person"; break;
-    }
-    if (!name) return nil;
-    return [UIImage systemImageNamed:name];
+    if (kind < 0) return [UIImage systemImageNamed:@"plus"];
+    return QDFloatIconCached(kind, selected);
 }
 
 // 读抖音按钮当前的角标（只读不建：getter 可能懒建对象，逐帧路径不安全）。
@@ -990,10 +1149,35 @@ static void QDFloatUpdate(AWENormalModeTabBar *bar) {
         gFloatBar = [[UITabBar alloc] initWithFrame:bar.bounds];
         gFloatBar.delegate = gFloatProxy;
         gFloatBar.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        // iOS 26 的 UITabBar 出厂态就是悬浮液态玻璃胶囊，不碰 appearance，
-        // 碰了反而会从「系统玻璃」掉回「自定义磨砂」。
         gFloatBar.tintColor = UIColor.labelColor;
         gFloatBar.unselectedItemTintColor = [UIColor colorWithWhite:0 alpha:0.55];
+
+        // 透亮化：只替换胶囊的背景材质为 Clear 档原生玻璃，布局/圆角/动效全部保留。
+        // 在保留系统默认 appearance 的基础上改（copy 出来改字段），避免从「系统玻璃」掉回「自定义磨砂」。
+        @try {
+            Class glassClass = NSClassFromString(@"UIGlassEffect");
+            if (glassClass) {
+                id effect = nil;
+                SEL styleSel = NSSelectorFromString(@"effectWithStyle:");
+                if ([glassClass respondsToSelector:styleSel]) {
+                    NSInteger style = QDYTTGlassClearEnabled() ? 1 : 0;
+                    effect = ((id (*)(id, SEL, NSInteger))objc_msgSend)((id)glassClass, styleSel, style);
+                }
+                if (!effect) effect = [[glassClass alloc] init];
+                if (effect) {
+                    UITabBarAppearance *appearance = [gFloatBar.standardAppearance copy] ?: [[UITabBarAppearance alloc] init];
+                    appearance.backgroundEffect = effect;
+                    appearance.backgroundColor = UIColor.clearColor;
+                    appearance.shadowColor = nil;
+                    gFloatBar.standardAppearance = appearance;
+                    if ([gFloatBar respondsToSelector:@selector(setScrollEdgeAppearance:)]) {
+                        gFloatBar.scrollEdgeAppearance = appearance;
+                    }
+                }
+            }
+        } @catch (__unused NSException *e) {
+        }
+        gFloatBar.backgroundColor = UIColor.clearColor;
     }
 
     // 作为子视图挂在抖音底栏内：显隐/透明度/位置全部随父视图继承。
@@ -1175,6 +1359,12 @@ static void QDYTTStartHeartbeat(void) {
 - (void)layoutSubviews {
     %orig;
     @try {
+        // 返回页面时抖音会把自绘内容重新画出来（opacity 归 1），而 QDYTTTick 有 0.25s
+        // 节流，慢半拍就是肉眼可见的「卡顿刷新一下」。这里用已缓存的按钮列表同帧压回，
+        // 不做树遍历，开销可忽略。
+        if (gQDFloatActive && (id)self == (id)gFloatHost && gFloatButtons.count > 0) {
+            QDFloatSetContentVisible(self, gFloatButtons, NO);
+        }
         QDYTTTick(self);
     } @catch (__unused NSException *exception) {}
 }
