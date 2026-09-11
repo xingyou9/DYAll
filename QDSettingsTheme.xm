@@ -145,9 +145,10 @@ static NSInteger QDCountEnabled(void) {
 - (instancetype)initWithFrame:(CGRect)frame {
     if ((self = [super initWithFrame:frame])) {
         CAGradientLayer *g = (CAGradientLayer *)self.layer;
-        g.colors = @[ (id)[UIColor colorWithRed:0.07 green:0.46 blue:0.56 alpha:1].CGColor,
-                      (id)[UIColor colorWithRed:0.24 green:0.22 blue:0.68 alpha:1].CGColor,
-                      (id)[UIColor colorWithRed:0.13 green:0.13 blue:0.32 alpha:1].CGColor ];
+        // 5.0.2：品牌大卡改为深色渐变（与下方状态卡同风格），不再用亮蓝紫
+        g.colors = @[ (id)[UIColor colorWithRed:0.17 green:0.18 blue:0.24 alpha:1].CGColor,
+                      (id)[UIColor colorWithRed:0.11 green:0.12 blue:0.17 alpha:1].CGColor,
+                      (id)[UIColor colorWithRed:0.07 green:0.07 blue:0.11 alpha:1].CGColor ];
         g.startPoint = CGPointMake(0, 0);
         g.endPoint = CGPointMake(1, 1);
         self.layer.cornerRadius = 24;
@@ -221,14 +222,14 @@ static NSInteger QDCountEnabled(void) {
 - (void)openPrivacy {
     UIViewController *vc = self.owner;
     if (!vc) return;
-    UIViewController *page = [[DYYYPrivacyCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-    [vc.navigationController pushViewController:page animated:DYYDMotionAllowed()];
+    UIViewController *page = [DYYDCenterPages privacyCenterPage];
+    if (page) [vc.navigationController pushViewController:page animated:DYYDMotionAllowed()];
 }
 
 - (void)openModes {
     UIViewController *vc = self.owner;
     if (!vc) return;
-    UIViewController *page = [[DYYYModeCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+    UIViewController *page = [DYYDCenterPages modeCenterPage];
     [vc.navigationController pushViewController:page animated:DYYDMotionAllowed()];
 }
 
@@ -418,13 +419,17 @@ static BOOL QDFuzzyMatch(NSString *hay, NSString *needle) {
 }
 
 - (void)backgroundTapped:(UITapGestureRecognizer *)gr {
-    if (self.panel.hidden || !self.owner) return;
+    if (!self.owner) return;
     // 点在浮层或搜索框内部不收起，避免打断开关操作
     CGPoint p = [gr locationInView:self.owner.view];
     CGRect fieldRect = [self.field convertRect:self.field.bounds toView:self.owner.view];
     if (CGRectContainsPoint(self.panel.frame, p) || CGRectContainsPoint(fieldRect, p)) return;
+    // 5.0.2 修复：之前浮层隐藏时直接 return，导致「点了搜索框没输入」时
+    // 点空白永远收不起键盘。现在点外部一律收键盘 + 收浮层。
+    BOOL panelWasShown = !self.panel.hidden;
     [self hidePanel];
     [self.field resignFirstResponder];
+    if (panelWasShown) self.field.text = @"";
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {
@@ -473,7 +478,17 @@ static UIImage *QDLineIconNamed(NSString *kind) {
         p.lineJoinStyle = kCGLineJoinRound;
         [p setLineWidth:1.7];
 
-        if ([kind isEqualToString:@"shield"]) {            // Hook 状态
+        if ([kind isEqualToString:@"gear"]) {              // Hook 状态
+            [p appendPath:[UIBezierPath bezierPathWithArcCenter:CGPointMake(9, 9) radius:3.4 startAngle:0 endAngle:M_PI * 2 clockwise:YES]];
+            [p stroke];
+            for (int i = 0; i < 8; i++) {
+                CGFloat a = i * M_PI / 4.0;
+                [p removeAllPoints];
+                [p moveToPoint:CGPointMake(9 + cosf(a) * 5.4, 9 + sinf(a) * 5.4)];
+                [p addLineToPoint:CGPointMake(9 + cosf(a) * 7.6, 9 + sinf(a) * 7.6)];
+                [p stroke];
+            }
+        } else if ([kind isEqualToString:@"shield"]) {     // Hook 状态（旧名，保留兼容）
             [p moveToPoint:CGPointMake(9, 1.8)];
             [p addLineToPoint:CGPointMake(15, 4)];
             [p addLineToPoint:CGPointMake(15, 8.6)];
@@ -718,7 +733,7 @@ static UIView *QDBuildHero(CGFloat width, UIViewController *owner, NSDictionary 
     search.font = [UIFont systemFontOfSize:14];
     search.textColor = UIColor.whiteColor;
     search.attributedPlaceholder = [[NSAttributedString alloc]
-        initWithString:@"搜索功能（下载 / 倍速 / 透明…）"
+        initWithString:@"搜索功能"
             attributes:@{ NSForegroundColorAttributeName : [UIColor colorWithWhite:1 alpha:0.55] }];
     search.backgroundColor = QDHeroSurfaceColor();
     search.layer.cornerRadius = 14;
@@ -929,19 +944,13 @@ static UIView *QDBuildHero(CGFloat width, UIViewController *owner, NSDictionary 
     recentBottom.priority = 250;
     [recentBottom setActive:YES];
 
-    // ——— 提示条 ———
-    UILabel *tip = [[UILabel alloc] init];
-    tip.text = @"三指长按屏幕可随时唤出「元抖助手」快捷面板";
-    tip.font = [UIFont systemFontOfSize:11 weight:UIFontWeightRegular];
-    tip.textColor = UIColor.secondaryLabelColor;
-    tip.textAlignment = NSTextAlignmentCenter;
+    // 5.0.2：底部「三指长按屏幕可随时唤出元抖助手」提示条已按用户要求删除
 
     [vstack addArrangedSubview:search];
     [vstack addArrangedSubview:card];
     [vstack addArrangedSubview:QDBuildStatusCard(owner)];
     [vstack addArrangedSubview:quick];
     [vstack addArrangedSubview:recentCard];
-    [vstack addArrangedSubview:tip];
 
     // 钉 top / 左右，底部用低优先级等于：既不与固定高度打架，又能让
     // systemLayoutSizeFitting 算出真实内容高度（tableHeaderView 必须给准确高度）

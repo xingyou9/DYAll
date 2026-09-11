@@ -3712,8 +3712,8 @@ speedSettingsItem.detail = trimmedText;
     modeCenterItem.colorStyle = 0;
     modeCenterItem.isEnable = YES;
     modeCenterItem.cellTappedBlock = ^{
-      UIViewController *page = [[DYYYModeCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-      [settingsVC.navigationController pushViewController:page animated:YES];
+      UIViewController *page = [DYYDCenterPages modeCenterPage];
+      if (page) [settingsVC.navigationController pushViewController:page animated:YES];
     };
     [mainItems addObject:modeCenterItem];
 
@@ -3727,8 +3727,8 @@ speedSettingsItem.detail = trimmedText;
     perfCenterItem.colorStyle = 0;
     perfCenterItem.isEnable = YES;
     perfCenterItem.cellTappedBlock = ^{
-      UIViewController *page = [[DYYYPerfCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-      [settingsVC.navigationController pushViewController:page animated:YES];
+      UIViewController *page = [DYYDCenterPages perfCenterPage];
+      if (page) [settingsVC.navigationController pushViewController:page animated:YES];
     };
     [mainItems addObject:perfCenterItem];
 
@@ -3742,8 +3742,8 @@ speedSettingsItem.detail = trimmedText;
     cacheCenterItem.colorStyle = 0;
     cacheCenterItem.isEnable = YES;
     cacheCenterItem.cellTappedBlock = ^{
-      UIViewController *page = [[DYYYCacheCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-      [settingsVC.navigationController pushViewController:page animated:YES];
+      UIViewController *page = [DYYDCenterPages cacheCenterPage];
+      if (page) [settingsVC.navigationController pushViewController:page animated:YES];
     };
     [mainItems addObject:cacheCenterItem];
 
@@ -3757,8 +3757,8 @@ speedSettingsItem.detail = trimmedText;
     privacyCenterItem.colorStyle = 0;
     privacyCenterItem.isEnable = YES;
     privacyCenterItem.cellTappedBlock = ^{
-      UIViewController *page = [[DYYYPrivacyCenterViewController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-      [settingsVC.navigationController pushViewController:page animated:YES];
+      UIViewController *page = [DYYDCenterPages privacyCenterPage];
+      if (page) [settingsVC.navigationController pushViewController:page animated:YES];
     };
     [mainItems addObject:privacyCenterItem];
 
